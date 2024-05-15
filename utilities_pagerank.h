@@ -1,4 +1,4 @@
-#include "xerrori.h"
+#include "helpers.h"
 #define Buf_size 32
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
@@ -58,7 +58,6 @@ typedef struct input_info {
  */
 void *manage_edges(void *arg);
 
-int readline(char *line, FILE *f);
 
 
 /**
@@ -73,22 +72,3 @@ int readline(char *line, FILE *f);
  * @return double   return array of pagerank
  */
 double *pagerank(graph *g, double d, double eps, int maxiter, int *numiter);
-
-
-
-
-
-
-
-
-
-
-// ----------------------------------  HELPER FUNCTIONS  ----------------------------------
-/**
- * @brief Helper function to print errors
- * 
- * @param msg message to print
- * @param file file containing the error
- * @param line line that caused the error
- */
-void printerr(char *msg, char *file, int line);
