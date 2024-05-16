@@ -10,5 +10,7 @@
 void printerr(char *msg, char *file, int line);
 
 
-int readline(char *line, FILE *f);
+int read_line(char** line, size_t *length, FILE *f);
+
+
 

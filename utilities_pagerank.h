@@ -3,13 +3,15 @@
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
 /**
- * @brief Data structure to implement the incoming nodes for each node
+ * @brief Data structure to implement the incoming nodes for each node (binary search tree)
  * 
  */
 typedef struct inmap {
-    int val; // index of the node
-    struct inmap* next; // pointer to the next element of the list
+    int val;                // index of the node
+    struct inmap* left;     // pointer to the left child
+    struct inmap* right;    // pointer to the right child
 } inmap;
+
 
 
 /**
@@ -20,7 +22,7 @@ typedef struct inmap {
 typedef struct graph {
     int N;      // number of nodes in the graph
     int *out;   // array with the number of exiting edges for each node
-    inmap *in;  // array of entering edges for each node
+    inmap **in;  // array of entering edges for each node
 } graph;
 
 
@@ -29,8 +31,8 @@ typedef struct graph {
  * 
  */
 typedef struct edge {
-    int src; // index of the source node of the edge
-    int dest; // index of the destination node of the edge
+    int src;    // index of the source node of the edge
+    int dest;   // index of the destination node of the edge
 } edge;
 
 
@@ -40,13 +42,17 @@ typedef struct edge {
  * 
  */
 typedef struct input_info {
-    pthread_cond_t canread;     // cv for reading from the buffer
-    pthread_cond_t canwrite;    // cv for writing to the buffer
-    pthread_mutex_t mutex;      // lock for the data array
+    pthread_cond_t *canread;     // cv for reading from the buffer
+    pthread_cond_t *canwrite;    // cv for writing to the buffer
+    pthread_mutex_t *mutex;      // lock for the data array
+    graph *g;                   // instance of the graph
     edge **arr;                 // array to pass edges between threads
     int *available;             // number of elements in the array
     int n;                      // length of the data array
+    int *position;              // current position in the array
 } input_info;
+
+
 
 
 // ----------------------------------  FUNCTIONS  ----------------------------------
@@ -58,6 +64,7 @@ typedef struct input_info {
  */
 void *manage_edges(void *arg);
 
+void print(inmap* t);
 
 
 /**
