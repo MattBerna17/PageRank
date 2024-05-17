@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
     if (optind >= argc) {
         printerr("[ERROR]: Expected argument after options. Terminating.", HERE);
     }
-    infile = argv[optind];
+    infile = strdup(argv[optind]);
 
     FILE *in = fopen(infile, "rt");
     if (in == NULL) {
@@ -63,8 +63,8 @@ int main(int argc, char* argv[]) {
     int cons_position = 0;
     int prod_position = 0;
 
-    pthread_t threads[t];
-    input_info infos[t];
+    pthread_t *threads = malloc(sizeof(pthread_t)*t);
+    input_info *infos = malloc(sizeof(input_info)*t);
 
     for (int i = 0; i < t; i++) {
         infos[i].canread = &canread;
@@ -83,20 +83,22 @@ int main(int argc, char* argv[]) {
     size_t length = 0;
     char *line = NULL;
     int n_edges = 0;
-    bool read = false;
-    while (!read) {
+    bool init_line_read = false;
+    while (!init_line_read) {
         int e = read_line(&line, &length, in);
         // e contains the return code, line contains the actual file line read
         if (e == 1) {
             // if the line read is a comment, continue
-            if (line[0] == '%') continue;
+            if (line[0] == '%') {
+                continue;
+            }
             else {
                 // in line r c n
-                int r, c;
+                // only need r and n, since r = c
+                int r;
                 char *v = strtok(line, " ");
                 r = atoi(v);
-                v = strtok(NULL, " ");
-                c = atoi(v);
+                v = strtok(NULL, " "); // skip c
                 v = strtok(NULL, " ");
                 n_edges = atoi(v);
 
@@ -109,7 +111,7 @@ int main(int argc, char* argv[]) {
                 }
                 g->out = out;
                 g->in = in;
-                read = true;
+                init_line_read = true;
             }
         } else {
             printerr("[ERROR]: Formatting error in the input file. Terminating.", HERE);
@@ -117,13 +119,13 @@ int main(int argc, char* argv[]) {
     }
 
 
-    int terminated_threads = 0;
+    int terminated_threads = 0; // counter for terminated threads
     while(terminated_threads < t) {
         edge *curr_edge = malloc(sizeof(edge));
-        int e = read_line(&line, &length, in);
+        int e = read_line(&line, &length, in); // read line from the file
         if (e == 1) {
             // the line contains i j, the edge from i to j
-            // tokenize the string
+            // tokenize the string using the space separator
             char *v = strtok(line, " ");
             int i = atoi(v);
             v = strtok(NULL, " ");
@@ -131,9 +133,10 @@ int main(int argc, char* argv[]) {
             curr_edge->src = i - 1;
             curr_edge->dest = j - 1;
         } else if (e == 0) {
-            // end of file, notify threads
+            // end of file, notify threads by sending the special edge NULL
+            free(curr_edge);
             curr_edge = NULL;
-            terminated_threads++;
+            terminated_threads++; // count the number of thread ended
         } else {
             printerr("[ERROR]: Error during file read. Terminating.", HERE);
         }
@@ -144,16 +147,23 @@ int main(int argc, char* argv[]) {
             xpthread_cond_wait(&canwrite, &mutex, QUI);
         }
         // add the edge in the buffer
-        arr[prod_position%n] = curr_edge;
+        arr[prod_position % n] = curr_edge;
         prod_position++;
         available++;
         xpthread_cond_signal(&canread, QUI); // notify the consumers that an edge is available
         xpthread_mutex_unlock(&mutex, QUI);
     }
 
+    for (int i = 0; i < t; i++) {
+        xpthread_join(threads[i], NULL, QUI);
+    }
+    
+    // print the infos after the buffer communication
     fprintf(stdout, "Number of nodes: %d\n", g->N);
     int count_edges = 0;
     int count_dead_ends = 0;
+    // count number of dead ends (out(i) = 0)
+    // count number of edges (by summing all the out(i))
     for (int i = 0; i < g->N; i++) {
         if (g->out[i] == 0) {
             count_dead_ends++;
@@ -164,7 +174,26 @@ int main(int argc, char* argv[]) {
 
     fprintf(stdout, "Number of dead-end nodes: %d\n", count_dead_ends);
     fprintf(stdout, "Number of valid arcs: %d\n", count_edges);
+    int numiter = 0;
+    pagerank(g, d, e, m, &numiter);
+
+
+    // free all the memory allocated and destroy condition variables and mutex
     xpthread_mutex_destroy(&mutex, QUI);
+    xpthread_cond_destroy(&canread, QUI);
+    xpthread_cond_destroy(&canwrite, QUI);
+    free(line);
+    for (int i = 0; i < g->N; i++) {
+        clear(g->in[i]);
+    }
+    free(g->in);
+    free(g->out);
+    free(arr);
+    free(g);
+    fclose(in);
+    free(infile);
+    free(threads);
+    free(infos);
 
     return 0;
 }

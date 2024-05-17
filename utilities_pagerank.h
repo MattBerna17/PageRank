@@ -13,16 +13,15 @@ typedef struct inmap {
 } inmap;
 
 
-
 /**
  * @brief Data structure to implement the adjacent graph
  * @see inmap
  * 
  */
 typedef struct graph {
-    int N;      // number of nodes in the graph
-    int *out;   // array with the number of exiting edges for each node
-    inmap **in;  // array of entering edges for each node
+    int N;          // number of nodes in the graph
+    int *out;       // array with the number of exiting edges for each node
+    inmap **in;     // array of entering edges for each node
 } graph;
 
 
@@ -57,14 +56,30 @@ typedef struct input_info {
 
 // ----------------------------------  FUNCTIONS  ----------------------------------
 /**
+ * @brief Function to add the value passed in the inmap
+ * 
+ * @param t         root node of the inmap tree
+ * @param val       value to add to the inmap tree
+ * @return true     if the new value is added correctly,
+ * @return false    if the value was already present in the inmap tree
+*/
+bool add(inmap** t, int val);
+
+/**
+ * @brief Function to free the memory blocks allocated dinamically for the inmap tree
+ * 
+ * @param t root node of the inmap tree
+ */
+void clear(inmap *t);
+
+
+/**
  * @brief Function executed by the threads to manage edges
  * 
  * @param arg input_info struct to communicate with the main thread
  * @return void* 
  */
 void *manage_edges(void *arg);
-
-void print(inmap* t);
 
 
 /**
