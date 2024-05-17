@@ -20,44 +20,44 @@ void print(inmap* t) {
 
 
 
-bool add(inmap **t, int val) {
-    inmap *node = malloc(sizeof(inmap));
-    node->val = val;
-    node->left = NULL;
-    node->right = NULL;
+// bool add(inmap **t, int val) {
+//     inmap *node = malloc(sizeof(inmap));
+//     node->val = val;
+//     node->left = NULL;
+//     node->right = NULL;
 
-    if (*t == NULL) {
-        // if the tree is empty, place the node and return true
-        printf("NULL: %d\n", val);
-        *t = node;
-        return true;
-    }
-    printf("TREE COMPARE: %d, %d\n", val, (*t)->val);
-    if (val == (*t)->val) {
-        // if the value is already in the tree, return false
-        free(node);
-        return false;
-    } else if (val < (*t)->val) {
-        // if val is less (go to the left)
-        if ((*t)->left == NULL) {
-            // if node is null, place it
-            (*t)->left = node;
-            return true;
-        } else {
-            // else, recursive search
-            free(node);
-            add(&(*t)->left, val);
-        }
-    } else if (val > (*t)->val) {
-        if ((*t)->right == NULL) {
-            (*t)->right = node;
-            return true;
-        } else {
-            free(node);
-            add(&(*t)->right, val);
-        }
-    }
-}
+//     if (*t == NULL) {
+//         // if the tree is empty, place the node and return true
+//         printf("NULL: %d\n", val);
+//         *t = node;
+//         return true;
+//     }
+//     printf("TREE COMPARE: %d, %d\n", val, (*t)->val);
+//     if (val == (*t)->val) {
+//         // if the value is already in the tree, return false
+//         free(node);
+//         return false;
+//     } else if (val < (*t)->val) {
+//         // if val is less (go to the left)
+//         if ((*t)->left == NULL) {
+//             // if node is null, place it
+//             (*t)->left = node;
+//             return true;
+//         } else {
+//             // else, recursive search
+//             free(node);
+//             add(&(*t)->left, val);
+//         }
+//     } else if (val > (*t)->val) {
+//         if ((*t)->right == NULL) {
+//             (*t)->right = node;
+//             return true;
+//         } else {
+//             free(node);
+//             add(&(*t)->right, val);
+//         }
+//     }
+// }
 
 
 // bool add(inmap **t, int val) {
