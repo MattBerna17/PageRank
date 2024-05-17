@@ -20,41 +20,41 @@ void print(inmap* t) {
 
 
 
-bool add(inmap *t, int val) {
+bool add(inmap **t, int val) {
     inmap *node = malloc(sizeof(inmap));
     node->val = val;
     node->left = NULL;
     node->right = NULL;
 
-    if (t == NULL) {
+    if (*t == NULL) {
         // if the tree is empty, place the node and return true
         printf("NULL: %d\n", val);
-        t = node;
+        *t = node;
         return true;
     }
-    printf("TREE COMPARE: %d, %d\n", val, t->val);
-    if (val == t->val) {
+    printf("TREE COMPARE: %d, %d\n", val, (*t)->val);
+    if (val == (*t)->val) {
         // if the value is already in the tree, return false
         free(node);
         return false;
-    } else if (val < t->val) {
+    } else if (val < (*t)->val) {
         // if val is less (go to the left)
-        if (t->left == NULL) {
+        if ((*t)->left == NULL) {
             // if node is null, place it
-            t->left = node;
+            (*t)->left = node;
             return true;
         } else {
             // else, recursive search
             free(node);
-            add(t->left, val);
+            add(&(*t)->left, val);
         }
-    } else if (val > t->val) {
-        if (t->right == NULL) {
-            t->right = node;
+    } else if (val > (*t)->val) {
+        if ((*t)->right == NULL) {
+            (*t)->right = node;
             return true;
         } else {
             free(node);
-            add(t->right, val);
+            add(&(*t)->right, val);
         }
     }
 }
@@ -127,9 +127,9 @@ void *manage_edges(void *arg) {
                     info->g->out[curr_edge->src]++;
                 }
             }
+            xpthread_cond_signal(info->canwrite, QUI);
+            xpthread_mutex_unlock(info->mutex, QUI);
         }
-        xpthread_cond_signal(info->canwrite, QUI);
-        xpthread_mutex_unlock(info->mutex, QUI);
     }
     pthread_exit(NULL);
 }

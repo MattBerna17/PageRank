@@ -164,6 +164,7 @@ int main(int argc, char* argv[]) {
 
     fprintf(stdout, "Number of dead-end nodes: %d\n", count_dead_ends);
     fprintf(stdout, "Number of valid arcs: %d\n", count_edges);
+    xpthread_mutex_destroy(&mutex, QUI);
 
     return 0;
 }
