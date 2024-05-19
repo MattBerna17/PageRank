@@ -174,8 +174,34 @@ int main(int argc, char* argv[]) {
 
     fprintf(stdout, "Number of dead-end nodes: %d\n", count_dead_ends);
     fprintf(stdout, "Number of valid arcs: %d\n", count_edges);
+    
+    // pagerank function call
     int numiter = 0;
-    pagerank(g, d, e, m, &numiter);
+    double *res = pagerank(g, d, e, m, t, &numiter);
+
+
+    double sum_ranks = 0; // to count the sum of all ranks
+    rank **top_ranks = malloc(sizeof(rank *) * g->N); // to store the ranks in order
+    
+    for (int i = 0; i < g->N; i++) {
+        sum_ranks += res[i];
+        top_ranks[i] = malloc(sizeof(rank));
+        top_ranks[i]->index = i;
+        top_ranks[i]->val = res[i];
+    }
+    // sort the top_ranks array by value of the rank (then pick the first k nodes to print)
+    qsort(top_ranks, g->N, sizeof(rank *), &cmp_ranks);
+
+    if (numiter == m) {
+        fprintf(stdout, "Did not converge after %d iterations\n", numiter);
+    } else {
+        fprintf(stdout, "Converged after %d iterations\n", numiter);
+    }
+    fprintf(stdout, "Sum of ranks: %f   (should be 1)\n", sum_ranks);
+    fprintf(stdout, "Top %d nodes:\n", k);
+    for (int i = 0; i < k; i++) {
+        fprintf(stdout, "  %d %f\n", top_ranks[i]->index, top_ranks[i]->val);
+    }
 
 
     // free all the memory allocated and destroy condition variables and mutex
@@ -189,11 +215,16 @@ int main(int argc, char* argv[]) {
     free(g->in);
     free(g->out);
     free(arr);
-    free(g);
     fclose(in);
     free(infile);
     free(threads);
     free(infos);
+    for (int i = 0; i < g->N; i++) {
+        free(top_ranks[i]);
+    }
+    free(top_ranks);
+    free(res);
+    free(g);
 
     return 0;
 }

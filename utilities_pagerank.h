@@ -52,6 +52,16 @@ typedef struct input_info {
 } input_info;
 
 
+/**
+ * @brief Data structure to store the ranks in a tuple: (index, value). It's only used to store the top k nodes
+ * 
+ */
+typedef struct rank {
+    int index;  // index of the node
+    double val; // rank of the node
+} rank;
+
+
 
 
 // ----------------------------------  FUNCTIONS  ----------------------------------
@@ -83,6 +93,16 @@ void *manage_edges(void *arg);
 
 
 /**
+ * @brief Function to compare ranks (used for qsort call)
+ * 
+ * @param a first rank to compare
+ * @param b second rank to compare
+ */
+int cmp_ranks(const void *a, const void *b);
+
+
+
+/**
  * @brief Function to calculate pagerank algorithm
  * @see graph
  * 
@@ -90,7 +110,8 @@ void *manage_edges(void *arg);
  * @param d         damping factor
  * @param eps       tolerance
  * @param maxiter   max number of iteration (to assure the termination)
+ * @param taux      number of auxiliary threads
  * @param numiter   actual number of iteration
  * @return double   return array of pagerank
  */
-double *pagerank(graph *g, double d, double eps, int maxiter, int *numiter);
+double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter);
