@@ -1,5 +1,5 @@
 #include "helpers.h"
-#define Buf_size 32
+#define Buf_size 64
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
 /**

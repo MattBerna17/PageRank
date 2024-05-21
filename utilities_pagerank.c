@@ -83,7 +83,7 @@ void *manage_edges(void *arg) {
 double compute_error(double *xnext, double *x, int n) {
     double err = 0.0;
     for (int i = 0; i < n; i++) {
-        err += abs(xnext[i] - x[i]);
+        err += fabs(xnext[i] - x[i]);
     }
     return err;
 }
@@ -115,7 +115,6 @@ double compute_y(graph *g, double *x, int j, double d) {
     double y = 0;
     inmap *node = g->in[j];
     y += aux(g, x, node);
-    printf("y: %f\n", y);
     return y;
 }
 
@@ -209,10 +208,8 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         }
         start = false;
         double st = compute_deadend(g, x, d);
-        printf("----------- X(%d) -----------\n", *numiter);
         for (int i = 0; i < g->N; i++)  {
             xnext[i] += st;
-            printf("\tx[%d] = %f\n", i, x[i]);
         }
         double error = compute_error(xnext, x, infos->n);
         for (int i = 0; i < g->N; i++)  {
@@ -221,14 +218,12 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         position = 0; // reset the position
         n_computed = 0; // reset the computed counter to 0
         // calculate error
-        printf("\n\n--> Next\n");
         (*numiter)++;
         if (*numiter == maxiter || error <= eps) {
             // warn the consumer threads that the computation has come to an end by sending an array of -1 elements
             for (int i = 0; i < g->N; i++) {
                 x[i] = -1.0;
             }
-            printf("Sent -1\n");
             terminated = true;
         }
         xpthread_cond_broadcast(&threads_can_proceed, QUI);
@@ -244,10 +239,6 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     free(infos);
     free(x);
     free(y);
-    printf("\n------------------ FINAL ------------------\n");
-    for (int i = 0; i < g->N; i++) {
-        printf("\tx[%d] = %f\n", i, xnext[i]);
-    }
 
     return xnext;
 }
