@@ -2,12 +2,16 @@
 #define HERE __FILE__, __LINE__
 #define QUI __LINE__, __FILE__
 
+
+
+// controlla malloc
+
 int main(int argc, char* argv[]) {
     // read options from command line
     int opt;
     int k = 3, m = 100, t = 3;
     float d = 0.9;
-    double e = 1.e7;
+    double e = 1.e-7;
     char *infile;
 
     // : --> needs an argument.
@@ -176,10 +180,12 @@ int main(int argc, char* argv[]) {
     fprintf(stdout, "Number of valid arcs: %d\n", count_edges);
     
     // pagerank function call
-    int numiter = 0;
+    int numiter = 1;
     double *res = pagerank(g, d, e, m, t, &numiter);
-
-
+    // *res = malloc(sizeof(double)*g->N);
+    // for (int i = 0; i < g->N; i++) {
+    //     res[i] = 1.0/g->N;
+    // }
     double sum_ranks = 0; // to count the sum of all ranks
     rank **top_ranks = malloc(sizeof(rank *) * g->N); // to store the ranks in order
     
@@ -188,6 +194,7 @@ int main(int argc, char* argv[]) {
         top_ranks[i] = malloc(sizeof(rank));
         top_ranks[i]->index = i;
         top_ranks[i]->val = res[i];
+        printf("Nodo %d\tRank %f\n", i, res[i]);
     }
     // sort the top_ranks array by value of the rank (then pick the first k nodes to print)
     qsort(top_ranks, g->N, sizeof(rank *), &cmp_ranks);
@@ -223,7 +230,7 @@ int main(int argc, char* argv[]) {
         free(top_ranks[i]);
     }
     free(top_ranks);
-    free(res);
+    // free(res);
     free(g);
 
     return 0;

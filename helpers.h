@@ -1,4 +1,5 @@
 #include "xerrori.h"
+#include "math.h"
 
 /**
  * @brief Helper function to print errors

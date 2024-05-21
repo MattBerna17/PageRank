@@ -79,6 +79,181 @@ void *manage_edges(void *arg) {
 
 
 
+
+double compute_error(double *xnext, double *x, int n) {
+    double err = 0.0;
+    for (int i = 0; i < n; i++) {
+        err += abs(xnext[i] - x[i]);
+    }
+    return err;
+}
+
+
+
+double compute_deadend(graph *g, double *x, double d) {
+    double st = 0.0;
+    for (int i = 0; i < g->N; i++) {
+        if (g->out[i] == 0) {
+            st += x[i];
+        }
+    }
+    return (d/g->N)*st;
+}
+
+
+
+double aux(graph *g, double *x, inmap *node) {
+    if (node == NULL) {
+        return 0;
+    } else {
+        return x[node->val]/g->out[node->val] + aux(g, x, node->left) + aux(g, x, node->right);
+    }
+}
+
+
+double compute_y(graph *g, double *x, int j, double d) {
+    double y = 0;
+    inmap *node = g->in[j];
+    y += aux(g, x, node);
+    printf("y: %f\n", y);
+    return y;
+}
+
+
+
+
+void *compute_pagerank(void *arg) {
+    compute_info *info = (compute_info *) arg;
+    bool terminated = false;
+    while (!terminated) {
+        xpthread_mutex_lock(info->mutex, QUI);
+        // while the computation has finished and the main has not started a new iteration, wait
+        while ((*info->n_computed) == info->n) {
+            xpthread_cond_wait(info->threads_can_proceed, info->mutex, QUI);
+        }
+        // check if the x value contains -1.0: in that case, end the computation for this thread
+        if (info->x[0] == -1.0) {
+            xpthread_mutex_unlock(info->mutex, QUI);
+            terminated = true;
+            break;
+        }
+        double sum_y = compute_y(info->g, info->x, (*info->position), info->d);
+        // set in the xnext[position] the calculated value
+        info->xnext[(*info->position) % info->n] = info->teleport + info->d*sum_y;
+        (*info->position)++;
+        (*info->n_computed)++;
+
+        // if the threads computed every element of X(t+1), signal to the main thread to start a new iteration
+        if ((*info->n_computed) == info->n) {
+            xpthread_cond_signal(info->main_can_proceed, QUI);
+        }
+        xpthread_mutex_unlock(info->mutex, QUI);
+    }
+    return 0;
+}
+
+
+
+
+
+
+
+double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter) {
+    // define the 3 used arrays: x, y and xnext
+    double *x = malloc(sizeof(double) * g->N);
+    double *y = malloc(sizeof(double) * g->N);
+    double *xnext = malloc(sizeof(double) * g->N);
+
+    // inizialization of the probability array X(1)
+    for (int i = 0; i < g->N; i++) {
+        x[i] = 1.0/g->N;
+    }
+    double teleport = (1.0 - d)/g->N; // teleporting term
+    
+    // initializing info to pass to the threads for the communication
+    pthread_t *threads = malloc(sizeof(pthread_t) * taux);
+    compute_info *infos = malloc(sizeof(compute_info) * taux);
+    pthread_cond_t main_can_proceed = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t threads_can_proceed = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    int n_computed = 0;
+    int position = 0;
+    bool start = false;
+
+    // set up information for the auxiliary threads
+    for (int i = 0; i < taux; i++) {
+        infos[i].main_can_proceed = &main_can_proceed;
+        infos[i].threads_can_proceed = &threads_can_proceed;
+        infos[i].mutex = &mutex;
+        infos[i].g = g;
+        infos[i].n_computed = &n_computed;
+        infos[i].position = &position;
+        infos[i].teleport = teleport;
+        infos[i].start = &start;
+        infos[i].d = d;
+        infos[i].x = x;
+        infos[i].y = y;
+        infos[i].xnext = xnext;
+        infos[i].n = g->N;
+
+        xpthread_create(&threads[i], NULL, &compute_pagerank, &infos[i], QUI);
+    }
+
+    bool terminated = false;
+    while (!terminated) {
+        xpthread_mutex_lock(&mutex, QUI);
+        start = true;
+        // wait until the number of computed elements of xnext is equal to the number of nodes (all pageranks are calculated for this iteration)
+        while (n_computed < g->N) {
+            xpthread_cond_wait(&main_can_proceed, &mutex, QUI);
+        }
+        start = false;
+        double st = compute_deadend(g, x, d);
+        printf("----------- X(%d) -----------\n", *numiter);
+        for (int i = 0; i < g->N; i++)  {
+            xnext[i] += st;
+            printf("\tx[%d] = %f\n", i, x[i]);
+        }
+        double error = compute_error(xnext, x, infos->n);
+        for (int i = 0; i < g->N; i++)  {
+            x[i] = xnext[i];
+        }; // set the calculated array to the previous
+        position = 0; // reset the position
+        n_computed = 0; // reset the computed counter to 0
+        // calculate error
+        printf("\n\n--> Next\n");
+        (*numiter)++;
+        if (*numiter == maxiter || error <= eps) {
+            // warn the consumer threads that the computation has come to an end by sending an array of -1 elements
+            for (int i = 0; i < g->N; i++) {
+                x[i] = -1.0;
+            }
+            printf("Sent -1\n");
+            terminated = true;
+        }
+        xpthread_cond_broadcast(&threads_can_proceed, QUI);
+        xpthread_mutex_unlock(&mutex, QUI);
+    }
+
+    // wait for all the threads to terminate execution
+    for (int i = 0; i < taux; i++) {
+        xpthread_join(threads[i], NULL, QUI);
+    }
+    // free used data structures
+    free(threads);
+    free(infos);
+    free(x);
+    free(y);
+    printf("\n------------------ FINAL ------------------\n");
+    for (int i = 0; i < g->N; i++) {
+        printf("\tx[%d] = %f\n", i, xnext[i]);
+    }
+
+    return xnext;
+}
+
+
+
 int cmp_ranks(const void *a, const void *b) {
     rank **r1 = (rank **) a;
     rank **r2 = (rank **) b;
@@ -89,18 +264,5 @@ int cmp_ranks(const void *a, const void *b) {
 
 
 
-double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter) {
-    double *x = malloc(sizeof(double) * g->N);
-    double *y = malloc(sizeof(double) * g->N);
-    double *xnext = malloc(sizeof(double) * g->N);
-    double error;
-    do {
-        // do the calculation with the threads
-        (*numiter)++;
-    } while (*numiter < maxiter && error > eps);
-    free(x);
-    free(y);
-    return xnext;
-}
 
 

@@ -52,6 +52,26 @@ typedef struct input_info {
 } input_info;
 
 
+
+
+typedef struct compute_info {
+    pthread_cond_t *main_can_proceed;
+    pthread_cond_t *threads_can_proceed;
+    pthread_mutex_t *mutex;
+    graph *g;
+    int *n_computed;        // number of elements of the X(t) array computed
+    int *position;
+    double teleport;
+    double d;
+    double *x;              // array X(t)
+    double *y;              // array Y(t)
+    double *xnext;          // array X(t+1)
+    int n;                  // number of elements of the arrays X, Y, Xnext
+    bool *start;            // boolean to start the computation
+} compute_info;
+
+
+
 /**
  * @brief Data structure to store the ranks in a tuple: (index, value). It's only used to store the top k nodes
  * 
