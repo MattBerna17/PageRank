@@ -1,5 +1,5 @@
 #include "helpers.h"
-#define Buf_size 64
+#define Buf_size 32
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
 /**
@@ -55,19 +55,32 @@ typedef struct input_info {
 
 
 typedef struct compute_info {
-    pthread_cond_t *main_can_proceed;
-    pthread_cond_t *threads_can_proceed;
-    pthread_mutex_t *mutex;
+    // condition variables to notify the start and end of pagerank computation in the X(t+1) array
+    pthread_cond_t *start_pagerank_computation;
+    pthread_cond_t *end_pagerank_computation;
+    pthread_mutex_t *mutex;                     // mutex to access the shared data
     graph *g;
-    int *n_computed;        // number of elements of the X(t) array computed
-    int *position;
-    double teleport;
-    double d;
-    double *x;              // array X(t)
-    double *y;              // array Y(t)
-    double *xnext;          // array X(t+1)
-    int n;                  // number of elements of the arrays X, Y, Xnext
-    bool *start;            // boolean to start the computation
+    int *n_computed;                            // number of elements of the X(t+1) array computed
+    int *position;                              // position of the current member of X(t+1)
+    double teleport;                            // teleporting term
+    double d;                                   // damping factor
+    double *x;                                  // array X(t)
+    double *y;                                  // array Y(t)
+    double *xnext;                              // array X(t+1)
+    int n;                                      // number of elements of the arrays X, Y, Xnext
+
+    // condition variables to notify the start and end of error computation
+    pthread_cond_t *start_error_computation;
+    pthread_cond_t *end_error_computation;
+    // condition variables to notify the start and end of Y(t+1) computation
+    pthread_cond_t *start_y_computation;
+    pthread_cond_t *end_y_computation;
+    // condition variables to notify the start and end of S_t computation
+    pthread_cond_t *start_deadend_computation;
+    pthread_cond_t *end_deadend_computation;
+    int start_index_x;                          // starting index of the portion of array assigned to this thread (for error, Y(t) and St)
+    int end_index_x;                            // ending index of the portion of array assigned to this thread (for error, Y(t) and St)
+    double *error_calculated;                   // value of error calculated by the thread in his portion of the array
 } compute_info;
 
 

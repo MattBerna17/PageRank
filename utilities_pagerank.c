@@ -105,7 +105,7 @@ double compute_deadend(graph *g, double *x, double d) {
 double aux(graph *g, double *x, inmap *node) {
     if (node == NULL) {
         return 0;
-    } else {
+    } else if (g->out[node->val] > 0) {
         return x[node->val]/g->out[node->val] + aux(g, x, node->left) + aux(g, x, node->right);
     }
 }
@@ -128,7 +128,7 @@ void *compute_pagerank(void *arg) {
         xpthread_mutex_lock(info->mutex, QUI);
         // while the computation has finished and the main has not started a new iteration, wait
         while ((*info->n_computed) == info->n) {
-            xpthread_cond_wait(info->threads_can_proceed, info->mutex, QUI);
+            xpthread_cond_wait(info->start_pagerank_computation, info->mutex, QUI);
         }
         // check if the x value contains -1.0: in that case, end the computation for this thread
         if (info->x[0] == -1.0) {
@@ -136,7 +136,12 @@ void *compute_pagerank(void *arg) {
             terminated = true;
             break;
         }
+        
+        
+        
+        // calculate the sum(Y_i) term for the current X(t+1) element (at position *info->position)
         double sum_y = compute_y(info->g, info->x, (*info->position), info->d);
+        
         // set in the xnext[position] the calculated value
         info->xnext[(*info->position) % info->n] = info->teleport + info->d*sum_y;
         (*info->position)++;
@@ -144,7 +149,7 @@ void *compute_pagerank(void *arg) {
 
         // if the threads computed every element of X(t+1), signal to the main thread to start a new iteration
         if ((*info->n_computed) == info->n) {
-            xpthread_cond_signal(info->main_can_proceed, QUI);
+            xpthread_cond_signal(info->end_pagerank_computation, QUI);
         }
         xpthread_mutex_unlock(info->mutex, QUI);
     }
@@ -172,46 +177,73 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     // initializing info to pass to the threads for the communication
     pthread_t *threads = malloc(sizeof(pthread_t) * taux);
     compute_info *infos = malloc(sizeof(compute_info) * taux);
-    pthread_cond_t main_can_proceed = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t threads_can_proceed = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t start_pagerank_computation = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t end_pagerank_computation = PTHREAD_COND_INITIALIZER;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     int n_computed = 0;
     int position = 0;
-    bool start = false;
+    pthread_cond_t start_error_computation = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t end_error_computation = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t start_y_computation = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t end_y_computation = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t start_deadend_computation = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t end_deadend_computation = PTHREAD_COND_INITIALIZER;
+    double *errors = malloc(sizeof(double) * taux); // contains all the errors calculated
 
     // set up information for the auxiliary threads
     for (int i = 0; i < taux; i++) {
-        infos[i].main_can_proceed = &main_can_proceed;
-        infos[i].threads_can_proceed = &threads_can_proceed;
+        infos[i].start_pagerank_computation = &start_pagerank_computation;
+        infos[i].end_pagerank_computation = &end_pagerank_computation;
         infos[i].mutex = &mutex;
         infos[i].g = g;
         infos[i].n_computed = &n_computed;
         infos[i].position = &position;
         infos[i].teleport = teleport;
-        infos[i].start = &start;
         infos[i].d = d;
         infos[i].x = x;
         infos[i].y = y;
         infos[i].xnext = xnext;
         infos[i].n = g->N;
 
+        infos[i].start_error_computation = &start_error_computation;
+        infos[i].end_error_computation = &end_error_computation;
+        infos[i].start_y_computation = &start_y_computation;
+        infos[i].end_y_computation = &end_y_computation;
+        infos[i].start_deadend_computation = &start_deadend_computation;
+        infos[i].end_deadend_computation = &end_deadend_computation;
+        infos[i].error_calculated = &errors[i];
+        infos[i].start_index_x = (i/taux)*g->N;
+        infos[i].end_index_x = ((i+1)/taux)*g->N;
         xpthread_create(&threads[i], NULL, &compute_pagerank, &infos[i], QUI);
     }
 
     bool terminated = false;
     while (!terminated) {
         xpthread_mutex_lock(&mutex, QUI);
-        start = true;
         // wait until the number of computed elements of xnext is equal to the number of nodes (all pageranks are calculated for this iteration)
         while (n_computed < g->N) {
-            xpthread_cond_wait(&main_can_proceed, &mutex, QUI);
+            xpthread_cond_wait(&end_pagerank_computation, &mutex, QUI);
         }
-        start = false;
+        
+        
+        
+        
         double st = compute_deadend(g, x, d);
+        
+        
+        
+        
         for (int i = 0; i < g->N; i++)  {
             xnext[i] += st;
         }
+        
+        
+        
         double error = compute_error(xnext, x, infos->n);
+        
+        
+        
+        
         for (int i = 0; i < g->N; i++)  {
             x[i] = xnext[i];
         }; // set the calculated array to the previous
@@ -226,7 +258,7 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
             }
             terminated = true;
         }
-        xpthread_cond_broadcast(&threads_can_proceed, QUI);
+        xpthread_cond_broadcast(&start_pagerank_computation, QUI);
         xpthread_mutex_unlock(&mutex, QUI);
     }
 
