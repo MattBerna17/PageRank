@@ -86,6 +86,18 @@ typedef struct compute_info {
 
 
 /**
+ * @brief Data structure to pass info to the signal manager thread
+ * 
+ */
+typedef struct signal_info {
+    double *x;          // array containing pagerank values
+    int n;              // length of X
+    int *numiter;       // current number of iterations
+    bool *terminated;   // manage signals until the value is true
+} signal_info;
+
+
+/**
  * @brief Data structure to store the ranks in a tuple: (index, value). It's only used to store the top k nodes
  * 
  */
@@ -115,6 +127,8 @@ bool add(inmap** t, int val);
  */
 void clear(inmap *t);
 
+
+void *tgestore(void *v);
 
 /**
  * @brief Function executed by the threads to manage edges

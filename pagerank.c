@@ -55,6 +55,11 @@ int main(int argc, char* argv[]) {
         printerr("[ERROR]: Bad file name. Terminating.", HERE);
     }
 
+    sigset_t mask;
+    sigemptyset(&mask);  // insieme di tutti i segnali
+    sigaddset(&mask, SIGUSR1); // elimino sigquit dall'insieme
+    pthread_sigmask(SIG_BLOCK, &mask, NULL); // block every signal except for SIGQUIT
+
 
     // create thread, read the file and communicate the lines read
     pthread_cond_t canread = PTHREAD_COND_INITIALIZER;

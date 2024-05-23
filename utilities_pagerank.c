@@ -2,6 +2,7 @@
 #define HERE __FILE__, __LINE__
 #define QUI __LINE__, __FILE__
 
+
 bool add(inmap** t, int val) {
     if (*t == NULL) {
         inmap *el = malloc(sizeof(inmap));
@@ -33,6 +34,35 @@ void clear(inmap *t) {
         free(t);
     }
 }
+
+
+
+
+void *manage_signal(void *arg) {
+    signal_info* info = (signal_info *) arg;
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1);
+    int s = 0;
+    while (!(*info->terminated)) {
+        int e = sigwait(&mask, &s);
+        if (e != 0) printerr("[ERROR]: error during signal management. Terminating", HERE);
+        if (s == SIGUSR1) {
+            int index = 0;
+            double max_pagerank = info->x[index];
+            for (int i = 0; i < info->n; i++) {
+                if (info->x[i] > max_pagerank) {
+                    max_pagerank = info->x[i];
+                    index = i;
+                }
+            }
+            fprintf(stderr, "Current number of iterations: %d\n", *info->numiter);
+            fprintf(stderr, "Node with maximum pagerank value: %d %f\n", index, max_pagerank);
+        }
+    }
+    return 0;
+}
+
 
 
 
@@ -188,7 +218,6 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     pthread_cond_t end_y_computation = PTHREAD_COND_INITIALIZER;
     pthread_cond_t start_deadend_computation = PTHREAD_COND_INITIALIZER;
     pthread_cond_t end_deadend_computation = PTHREAD_COND_INITIALIZER;
-    double *errors = malloc(sizeof(double) * taux); // contains all the errors calculated
 
     // set up information for the auxiliary threads
     for (int i = 0; i < taux; i++) {
@@ -211,13 +240,31 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         infos[i].end_y_computation = &end_y_computation;
         infos[i].start_deadend_computation = &start_deadend_computation;
         infos[i].end_deadend_computation = &end_deadend_computation;
-        infos[i].error_calculated = &errors[i];
         infos[i].start_index_x = (i/taux)*g->N;
         infos[i].end_index_x = ((i+1)/taux)*g->N;
         xpthread_create(&threads[i], NULL, &compute_pagerank, &infos[i], QUI);
     }
 
-    bool terminated = false;
+    bool terminated = false; // pagerank computation terminated?
+
+    
+    // create the SIGUSR1 manager thread
+    signal_info *sig_info = malloc(sizeof(signal_info));
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1); // add SIGUSR1 to the list of blocked signals
+    pthread_sigmask(SIG_BLOCK, &mask, NULL); // block SIGUSR1 for this thread (main thread)
+    // create the signal manager thread
+    pthread_t *sig_manager = malloc(sizeof(pthread_t));
+    // pass the data to the signal manager
+    sig_info->numiter = numiter;
+    sig_info->x = x;
+    sig_info->terminated = &terminated;
+    sig_info->n = g->N;
+    xpthread_create(sig_manager, NULL, &manage_signal, sig_info, QUI);
+
+
+
     while (!terminated) {
         xpthread_mutex_lock(&mutex, QUI);
         // wait until the number of computed elements of xnext is equal to the number of nodes (all pageranks are calculated for this iteration)
@@ -243,7 +290,6 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         
         
         
-        
         for (int i = 0; i < g->N; i++)  {
             x[i] = xnext[i];
         }; // set the calculated array to the previous
@@ -266,11 +312,15 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     for (int i = 0; i < taux; i++) {
         xpthread_join(threads[i], NULL, QUI);
     }
+    // xpthread_join(*sig_manager, NULL, QUI);
+
     // free used data structures
     free(threads);
     free(infos);
     free(x);
     free(y);
+    free(sig_info);
+    free(sig_manager);
 
     return xnext;
 }
@@ -284,8 +334,5 @@ int cmp_ranks(const void *a, const void *b) {
     else if ((*r1)->val > (*r2)->val) return -1;
     else return 0;
 }
-
-
-
 
 
