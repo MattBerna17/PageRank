@@ -4,24 +4,46 @@
 
 
 bool add(inmap** t, int val) {
+    // create the node for the new value
+    inmap* new_node = (inmap*)malloc(sizeof(inmap));
+    new_node->val = val;
+    new_node->left = NULL;
+    new_node->right = NULL;
+
+    // if the tree is empty, place the node as the root node
     if (*t == NULL) {
-        inmap *el = malloc(sizeof(inmap));
-        el->val = val;
-        el->left = NULL;
-        el->right = NULL;
-        *t = el;
+        *t = new_node;
         return true;
-    } else if ((*t)->val == val) {
-        return false;
-    } else {
-        if ((*t)->val > val) {
-            return add(&(*t)->left, val);
-        } else if ((*t)->val < val) {
-            return add(&(*t)->right, val);
+    }
+
+    inmap* current = *t;
+    inmap* parent = NULL;
+    while (current != NULL) {
+        parent = current;
+
+        // if the value is less then the current node, go left
+        if (val < current->val) {
+            current = current->left;
+            if (current == NULL) {
+                parent->left = new_node;
+                return true;
+            }
+        } else if (val > current->val) {
+            // if the value is greater then the current node, go right
+            current = current->right;
+            if (current == NULL) {
+                parent->right = new_node;
+                return true;
+            }
+        } else {
+            // if the value is already in the tree, return false
+            free(new_node);
+            return false;
         }
     }
     return false;
 }
+
 
 
 
