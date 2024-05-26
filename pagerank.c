@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
 
                 g->N = r; // number of nodes
                 int *out = malloc(sizeof(int)*g->N); // define the array containing the number of out edges of each node
-                inmap **in = malloc(sizeof(inmap*)*g->N);
+                inmap *in = malloc(sizeof(inmap)*g->N);
                 for (int i = 0; i < g->N; i++) {
                     out[i] = 0;
                     in[i] = NULL;

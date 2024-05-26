@@ -3,15 +3,10 @@
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
 /**
- * @brief Data structure to implement the incoming nodes for each node (binary search tree)
+ * @brief Data structure to store a tree in the graph
  * 
  */
-typedef struct inmap {
-    int val;                // index of the node
-    struct inmap* left;     // pointer to the left child
-    struct inmap* right;    // pointer to the right child
-} inmap;
-
+typedef node *inmap;
 
 /**
  * @brief Data structure to implement the adjacent graph
@@ -21,7 +16,7 @@ typedef struct inmap {
 typedef struct graph {
     int N;          // number of nodes in the graph
     int *out;       // array with the number of exiting edges for each node
-    inmap **in;     // array of entering edges for each node
+    inmap *in;     // array of entering edges for each node
 } graph;
 
 
@@ -110,22 +105,22 @@ typedef struct rank {
 
 
 // ----------------------------------  FUNCTIONS  ----------------------------------
-/**
- * @brief Function to add the value passed in the inmap
- * 
- * @param t         root node of the inmap tree
- * @param val       value to add to the inmap tree
- * @return true     if the new value is added correctly,
- * @return false    if the value was already present in the inmap tree
-*/
-bool add(inmap** t, int val);
+// /**
+//  * @brief Function to add the value passed in the inmap
+//  * 
+//  * @param t         root node of the inmap tree
+//  * @param val       value to add to the inmap tree
+//  * @return true     if the new value is added correctly,
+//  * @return false    if the value was already present in the inmap tree
+// */
+// bool add(inmap** t, int val);
 
-/**
- * @brief Function to free the memory blocks allocated dinamically for the inmap tree
- * 
- * @param t root node of the inmap tree
- */
-void clear(inmap *t);
+// /**
+//  * @brief Function to free the memory blocks allocated dinamically for the inmap tree
+//  * 
+//  * @param t root node of the inmap tree
+//  */
+// void clear(inmap *t);
 
 
 void *tgestore(void *v);

@@ -3,68 +3,13 @@
 #define QUI __LINE__, __FILE__
 
 
-bool add(inmap** t, int val) {
-    // create the node for the new value
-    inmap* new_node = (inmap*)malloc(sizeof(inmap));
-    new_node->val = val;
-    new_node->left = NULL;
-    new_node->right = NULL;
-
-    // if the tree is empty, place the node as the root node
-    if (*t == NULL) {
-        *t = new_node;
-        return true;
-    }
-
-    inmap* current = *t;
-    inmap* parent = NULL;
-    while (current != NULL) {
-        parent = current;
-
-        // if the value is less then the current node, go left
-        if (val < current->val) {
-            current = current->left;
-            if (current == NULL) {
-                parent->left = new_node;
-                return true;
-            }
-        } else if (val > current->val) {
-            // if the value is greater then the current node, go right
-            current = current->right;
-            if (current == NULL) {
-                parent->right = new_node;
-                return true;
-            }
-        } else {
-            // if the value is already in the tree, return false
-            free(new_node);
-            return false;
-        }
-    }
-    return false;
-}
-
-
-
-
-void clear(inmap *t) {
-    if (t == NULL) {
-        return;
-    } else {
-        clear(t->left);
-        clear(t->right);
-        free(t);
-    }
-}
-
-
-
 
 void *manage_signal(void *arg) {
     signal_info* info = (signal_info *) arg;
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGUSR1);
+    sigaddset(&mask, SIGUSR2); // when the pagerank computation has ended, the main thread sends a SIGUSR2 signal to the signal manager thread
     int s = 0;
     while (!(*info->terminated)) {
         int e = sigwait(&mask, &s);
@@ -80,6 +25,8 @@ void *manage_signal(void *arg) {
             }
             fprintf(stderr, "Current number of iterations: %d\n", *info->numiter);
             fprintf(stderr, "Node with maximum pagerank value: %d %f\n", index, max_pagerank);
+        } else if (s == SIGUSR2 && *info->terminated) {
+            break;
         }
     }
     return 0;
@@ -154,19 +101,19 @@ double compute_deadend(graph *g, double *x, double d) {
 
 
 
-double aux(graph *g, double *x, inmap *node) {
-    if (node == NULL) {
+double aux(graph *g, double *x, inmap *n) {
+    if ((*n) == NULL) {
         return 0;
-    } else if (g->out[node->val] > 0) {
-        return x[node->val]/g->out[node->val] + aux(g, x, node->left) + aux(g, x, node->right);
+    } else if (g->out[(*n)->val] > 0) {
+        return x[(*n)->val]/g->out[(*n)->val] + aux(g, x, &(*n)->left) + aux(g, x, &(*n)->right);
     }
 }
 
 
 double compute_y(graph *g, double *x, int j, double d) {
     double y = 0;
-    inmap *node = g->in[j];
-    y += aux(g, x, node);
+    inmap *n = &(g->in[j]);
+    y += aux(g, x, n);
     return y;
 }
 
@@ -311,19 +258,17 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         double error = compute_error(xnext, x, infos->n);
         
         
-        
+        // set the calculated array to the previous
         for (int i = 0; i < g->N; i++)  {
             x[i] = xnext[i];
-        }; // set the calculated array to the previous
+        };
         position = 0; // reset the position
         n_computed = 0; // reset the computed counter to 0
         // calculate error
         (*numiter)++;
         if (*numiter == maxiter || error <= eps) {
             // warn the consumer threads that the computation has come to an end by sending an array of -1 elements
-            for (int i = 0; i < g->N; i++) {
-                x[i] = -1.0;
-            }
+            x[0] = -1.0;
             terminated = true;
         }
         xpthread_cond_broadcast(&start_pagerank_computation, QUI);
@@ -334,7 +279,8 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     for (int i = 0; i < taux; i++) {
         xpthread_join(threads[i], NULL, QUI);
     }
-    // xpthread_join(*sig_manager, NULL, QUI);
+    pthread_kill(*sig_manager, SIGUSR2); // signal the end of the pagerank computation
+    xpthread_join(*sig_manager, NULL, QUI);
 
     // free used data structures
     free(threads);

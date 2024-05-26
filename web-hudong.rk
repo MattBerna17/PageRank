@@ -1,9 +1,0 @@
-Number of nodes: 1984484
-Number of dead-end nodes: 258743
-Number of valid arcs: 14682258
-Converged after 27 iterations
-Sum of ranks: 1.000000   (should be 1)
-Top 3 nodes:
-  116 0.002712
-  6 0.002346
-  354 0.001814
