@@ -3,7 +3,6 @@
 #define QUI __LINE__, __FILE__
 
 
-
 void *manage_signal(void *arg) {
     signal_info* info = (signal_info *) arg;
     sigset_t mask;
@@ -79,6 +78,7 @@ void *manage_edges(void *arg) {
 
 
 
+
 double compute_error(double *xnext, double *x, int n) {
     double err = 0.0;
     for (int i = 0; i < n; i++) {
@@ -86,7 +86,6 @@ double compute_error(double *xnext, double *x, int n) {
     }
     return err;
 }
-
 
 
 double compute_deadend(graph *g, double *x, double d) {
@@ -98,7 +97,6 @@ double compute_deadend(graph *g, double *x, double d) {
     }
     return (d/g->N)*st;
 }
-
 
 
 double aux(graph *g, double *x, inmap *n) {
@@ -116,8 +114,6 @@ double compute_y(graph *g, double *x, int j, double d) {
     y += aux(g, x, n);
     return y;
 }
-
-
 
 
 void *compute_pagerank(void *arg) {
@@ -160,12 +156,20 @@ void *compute_pagerank(void *arg) {
 
 
 
-
 double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter) {
     // define the 3 used arrays: x, y and xnext
     double *x = malloc(sizeof(double) * g->N);
+    if (x == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
     double *y = malloc(sizeof(double) * g->N);
+    if (y == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
     double *xnext = malloc(sizeof(double) * g->N);
+    if (xnext == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
 
     // inizialization of the probability array X(1)
     for (int i = 0; i < g->N; i++) {
@@ -175,7 +179,13 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     
     // initializing info to pass to the threads for the communication
     pthread_t *threads = malloc(sizeof(pthread_t) * taux);
+    if (threads == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
     compute_info *infos = malloc(sizeof(compute_info) * taux);
+    if (infos == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
     pthread_cond_t start_pagerank_computation = PTHREAD_COND_INITIALIZER;
     pthread_cond_t end_pagerank_computation = PTHREAD_COND_INITIALIZER;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -219,12 +229,18 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     
     // create the SIGUSR1 manager thread
     signal_info *sig_info = malloc(sizeof(signal_info));
+    if (sig_info == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGUSR1); // add SIGUSR1 to the list of blocked signals
     pthread_sigmask(SIG_BLOCK, &mask, NULL); // block SIGUSR1 for this thread (main thread)
     // create the signal manager thread
     pthread_t *sig_manager = malloc(sizeof(pthread_t));
+    if (sig_manager == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating");
+    }
     // pass the data to the signal manager
     sig_info->numiter = numiter;
     sig_info->x = x;
@@ -292,6 +308,8 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
 
     return xnext;
 }
+
+
 
 
 

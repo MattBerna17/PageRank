@@ -8,6 +8,7 @@
  */
 typedef node *inmap;
 
+
 /**
  * @brief Data structure to implement the adjacent graph
  * @see inmap
@@ -47,8 +48,10 @@ typedef struct input_info {
 } input_info;
 
 
-
-
+/**
+ * @brief Data structure to pass info to the threads that need to compute the pagerank calculation
+ * 
+ */
 typedef struct compute_info {
     // condition variables to notify the start and end of pagerank computation in the X(t+1) array
     pthread_cond_t *start_pagerank_computation;
@@ -79,7 +82,6 @@ typedef struct compute_info {
 } compute_info;
 
 
-
 /**
  * @brief Data structure to pass info to the signal manager thread
  * 
@@ -105,25 +107,15 @@ typedef struct rank {
 
 
 // ----------------------------------  FUNCTIONS  ----------------------------------
-// /**
-//  * @brief Function to add the value passed in the inmap
-//  * 
-//  * @param t         root node of the inmap tree
-//  * @param val       value to add to the inmap tree
-//  * @return true     if the new value is added correctly,
-//  * @return false    if the value was already present in the inmap tree
-// */
-// bool add(inmap** t, int val);
-
-// /**
-//  * @brief Function to free the memory blocks allocated dinamically for the inmap tree
-//  * 
-//  * @param t root node of the inmap tree
-//  */
-// void clear(inmap *t);
+/**
+ * @brief Function executed by the signal manager thread
+ * 
+ * @param arg signal_info struct to receive data from the main thread
+ * @return void* 
+ */
+void *manage_signal(void *arg);
 
 
-void *tgestore(void *v);
 
 /**
  * @brief Function executed by the threads to manage edges
@@ -132,6 +124,7 @@ void *tgestore(void *v);
  * @return void* 
  */
 void *manage_edges(void *arg);
+
 
 
 /**
