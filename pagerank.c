@@ -54,9 +54,10 @@ int main(int argc, char* argv[]) {
     }
 
     sigset_t mask;
-    sigemptyset(&mask);  // insieme di tutti i segnali
-    sigaddset(&mask, SIGUSR1); // elimino sigquit dall'insieme
-    pthread_sigmask(SIG_BLOCK, &mask, NULL); // block every signal except for SIGQUIT
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1);
+    sigaddset(&mask, SIGUSR2);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
 
     // create thread, read the file and communicate the lines read
@@ -65,12 +66,12 @@ int main(int argc, char* argv[]) {
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     graph *g = malloc(sizeof(graph));
     if (g == NULL) {
-        printerr("[ERROR]: malloc not succeded. Terminating");
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
     int n = Buf_size;
     edge **arr = malloc(sizeof(edge*)*n);
     if (arr == NULL) {
-        printerr("[ERROR]: malloc not succeded. Terminating");
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
     int available = 0;
     int cons_position = 0;
@@ -78,11 +79,11 @@ int main(int argc, char* argv[]) {
 
     pthread_t *threads = malloc(sizeof(pthread_t)*t);
     if (threads == NULL) {
-        printerr("[ERROR]: malloc not succeded. Terminating");
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
     input_info *infos = malloc(sizeof(input_info)*t);
     if (infos == NULL) {
-        printerr("[ERROR]: malloc not succeded. Terminating");
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
 
     for (int i = 0; i < t; i++) {
@@ -124,11 +125,11 @@ int main(int argc, char* argv[]) {
                 g->N = r; // number of nodes
                 int *out = malloc(sizeof(int)*g->N); // define the array containing the number of out edges of each node
                 if (out == NULL) {
-                    printerr("[ERROR]: malloc not succeded. Terminating");
+                    printerr("[ERROR]: malloc not succeded. Terminating", HERE);
                 }
                 inmap *in = malloc(sizeof(inmap)*g->N);
                 if (in == NULL) {
-                    printerr("[ERROR]: malloc not succeded. Terminating");
+                    printerr("[ERROR]: malloc not succeded. Terminating", HERE);
                 }
                 for (int i = 0; i < g->N; i++) {
                     out[i] = 0;
@@ -148,7 +149,7 @@ int main(int argc, char* argv[]) {
     while(terminated_threads < t) {
         edge *curr_edge = malloc(sizeof(edge));
         if (curr_edge == NULL) {
-            printerr("[ERROR]: malloc not succeded. Terminating");
+            printerr("[ERROR]: malloc not succeded. Terminating", HERE);
         }
         int e = read_line(&line, &length, in); // read line from the file
         if (e == 1) {
@@ -209,14 +210,14 @@ int main(int argc, char* argv[]) {
     double sum_ranks = 0; // to count the sum of all ranks
     rank **top_ranks = malloc(sizeof(rank *) * g->N); // to store the ranks in order
     if (top_ranks == NULL) {
-        printerr("[ERROR]: malloc not succeded. Terminating");
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
     
     for (int i = 0; i < g->N; i++) {
         sum_ranks += res[i];
         top_ranks[i] = malloc(sizeof(rank));
         if (top_ranks[i] == NULL) {
-            printerr("[ERROR]: malloc not succeded. Terminating");
+            printerr("[ERROR]: malloc not succeded. Terminating", HERE);
         }
         top_ranks[i]->index = i;
         top_ranks[i]->val = res[i];
