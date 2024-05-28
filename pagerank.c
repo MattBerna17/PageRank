@@ -102,7 +102,6 @@ int main(int argc, char* argv[]) {
 
     size_t length = 0;
     char *line = NULL;
-    int n_edges = 0;
     bool init_line_read = false;
     while (!init_line_read) {
         int e = read_line(&line, &length, in);
@@ -119,8 +118,7 @@ int main(int argc, char* argv[]) {
                 char *v = strtok(line, " ");
                 r = atoi(v);
                 v = strtok(NULL, " "); // skip c
-                v = strtok(NULL, " ");
-                n_edges = atoi(v);
+                v = strtok(NULL, " "); // skip the number of edges
 
                 g->N = r; // number of nodes
                 int *out = malloc(sizeof(int)*g->N); // define the array containing the number of out edges of each node

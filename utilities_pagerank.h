@@ -53,36 +53,33 @@ typedef struct input_info {
  * 
  */
 typedef struct compute_info {
-    // condition variables to notify the start and end of pagerank computation in the X(t+1) array
-    pthread_cond_t *start_pagerank_computation;
-    pthread_cond_t *end_pagerank_computation;
-    pthread_mutex_t *mutex;                     // mutex to access the shared data
+    bool *terminated;
     graph *g;
-    int *n_computed;                            // number of elements of the X(t+1) array computed
-    int *position;                              // position of the current member of X(t+1)
-    double teleport;                            // teleporting term
-    double d;                                   // damping factor
-    double *x;                                  // array X(t)
-    double *y;                                  // array Y(t)
-    double *xnext;                              // array X(t+1)
-    int n;                                      // number of elements of the arrays X, Y, Xnext
-    bool *terminated;                           // true if the computation has terminated, false otherwise
-    
-    double *st;                                 // st value calculated by the threads
-    pthread_cond_t *start_deadend;
-    pthread_cond_t *end_deadend;
-    int *de_pos;
-    bool *deadend_terminated;
-    pthread_mutex_t *mutex_deadend;
 
+    pthread_mutex_t *de_mutex;
+    pthread_cond_t *de_completed;
     pthread_cond_t *barrier1;
+    bool *is_de_computed;
+    double *st;
+    int *idx_de;
+
+    pthread_mutex_t *pr_mutex;
+    pthread_cond_t *pr_completed;
     pthread_cond_t *barrier2;
+    bool *is_pr_computed;
+    double *x;
+    double *xnext;
+    double *y;
+    int *idx_pr;
+    double teleport;
+    double d;
 
-    bool *pagerank_terminated;
-
-
-    bool *is_iter_terminated;
-
+    pthread_mutex_t *error_mutex;
+    pthread_cond_t *error_completed;
+    pthread_cond_t *barrier3;
+    bool *is_error_computed;
+    double *error;
+    int *idx_error;
 } compute_info;
 
 
