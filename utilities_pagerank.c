@@ -95,119 +95,121 @@ double compute_y(graph *g, double *x, int j, double d) {
 
 
 
+
 /**
- * @brief Function to compute the St value for the current iteration
+ * @brief Function to compute the deadend contribute
  * 
  * @param info data passed by the main thread
  */
 void compute_st(compute_info *info) {
+    xpthread_mutex_lock(info->de_mutex, QUI);
     while (true) {
-        xpthread_mutex_lock(info->de_mutex, QUI);
-        // while the computation has finished for the value St
-        while (*info->idx_de == info->g->N) {
-            // wait until the main thread signals the start of the next phase
+        // wait on the first barrier until the main thread starts the next phase or until the computation has ended
+        while (*info->idx_de == info->g->N && !(*info->terminated)) {
             xpthread_cond_wait(info->barrier1, info->de_mutex, QUI);
         }
-        // if the computation of St has ended, unlock and exit the method
-        if (*info->is_de_computed) {
+        // if the deadend has been computed or the overall computation has ended, unlock and exit the function
+        if (*info->is_de_computed || *info->terminated) {
             xpthread_mutex_unlock(info->de_mutex, QUI);
             return;
         }
-        // if the node pointed is a deadend, add the value to the St
+        // if the current node is a deadend, add its x value to the overall st value
         if (info->g->out[*info->idx_de % info->g->N] == 0) {
             *info->st += info->x[*info->idx_de % info->g->N];
         }
-        (*info->idx_de)++; // increment the value of the index of deadend
-        // in case of end of the computation of St (current index is equal to the length of the vector)
+        (*info->idx_de)++; // increment the value
+        // signal if the analyzed element was the last node
         if (*info->idx_de == info->g->N) {
-            // signal to the main thread the end of the deadend computation
             xpthread_cond_signal(info->de_completed, QUI);
         }
-        xpthread_mutex_unlock(info->de_mutex, QUI);
     }
+    xpthread_mutex_unlock(info->de_mutex, QUI);
 }
 
 
 /**
- * @brief Function to compute the pagerank iteration
+ * @brief Function to compute a pagerank iteration
  * 
- * @param info data passed by the main thread 
+ * @param info data passed by the main thread
  */
 void compute_pr(compute_info *info) {
+    xpthread_mutex_lock(info->pr_mutex, QUI);
     while (true) {
-        xpthread_mutex_lock(info->pr_mutex, QUI);
-        // while the computation has ended (xnext all computed)
-        while (*info->idx_pr == info->g->N) {
-            // wait until the main thread starts the next phase
+        // wait on the second barrier until the main thread signals the start of the next phase or the computation has ended
+        while (*info->idx_pr == info->g->N && !(*info->terminated)) {
             xpthread_cond_wait(info->barrier2, info->pr_mutex, QUI);
         }
-        // if the computation has ended, unlock and exit
-        if (*info->is_pr_computed) {
+        // if the iteration has finished or the computation has finished, exit the function
+        if (*info->is_pr_computed || *info->terminated) {
             xpthread_mutex_unlock(info->pr_mutex, QUI);
             return;
         }
-        // compute the Y value for this current element
+        // compute the y element
         double sum_y = compute_y(info->g, info->x, (*info->idx_pr) % info->g->N, info->d);
-        // compute the xnext value
+        // compute xnext value
         info->xnext[(*info->idx_pr) % info->g->N] = info->teleport + info->d * sum_y + (*info->st);
-        // increment the index
-        (*info->idx_pr)++;
+        (*info->idx_pr)++; // increment the index of the pagerank
+        // if the computed element was the last, signal the end of the iteration
         if (*info->idx_pr == info->g->N) {
             xpthread_cond_signal(info->pr_completed, QUI);
         }
-        xpthread_mutex_unlock(info->pr_mutex, QUI);
     }
+    xpthread_mutex_unlock(info->pr_mutex, QUI);
 }
 
 
 /**
- * @brief Function to compute the error resulted from X - Xnext
+ * @brief Function to compute the error of the current iteration
  * 
  * @param info data passed by the main thread
  */
 void compute_error(compute_info *info) {
+    xpthread_mutex_lock(info->error_mutex, QUI);
     while (true) {
-        xpthread_mutex_lock(info->error_mutex, QUI);
-        // if the computation has ended
-        while (*info->idx_error == info->g->N) {
-            // wait for the main thread to start the new iteration
+        // wait on the final barrier until the main thread signals the end of the current iteration or the computation has ended
+        while (*info->idx_error == info->g->N && !(*info->terminated)) {
             xpthread_cond_wait(info->barrier3, info->error_mutex, QUI);
         }
-        // if the computation has ended, unlock and exit
-        if (*info->is_error_computed) {
+        // if the error has been calculated or the computation has finished, exit the function
+        if (*info->is_error_computed || *info->terminated) {
             xpthread_mutex_unlock(info->error_mutex, QUI);
             return;
         }
-        // compute the error for this element of the vector
+        // compute the error for the current index
         *info->error += fabs(info->x[(*info->idx_error) % info->g->N] - info->xnext[(*info->idx_error) % info->g->N]);
-        // increment the index of the current element
-        (*info->idx_error)++;
+        (*info->idx_error)++; // increment the index for the error calculation
+        // if the element analyzed was the last, signal the end of the error computation
         if (*info->idx_error == info->g->N) {
             xpthread_cond_signal(info->error_completed, QUI);
         }
-        xpthread_mutex_unlock(info->error_mutex, QUI);
     }
+    xpthread_mutex_unlock(info->error_mutex, QUI);
 }
 
-
-
-
 /**
- * @brief Function executed by the threads
+ * @brief Function executed by each thread
  * 
  * @param arg data passed by the main thread
  * @return void* 
  */
 void *tbody(void *arg) {
     compute_info *info = (compute_info *) arg;
-    // while the error is greater than the error passed and the number of iterations is less than the specified one...
+    // repeat these 3 computations until the main signals the end of the computation
     while (!(*info->terminated)) {
-        // first phase: compute the deadend contribute
+        // first phase: compute St for the current iteration
         compute_st(info);
-        // second phase: compute the pagerank iteration
+
+        // first barrier
+        
+        // second phase: compute Xnext for the current iteration
         compute_pr(info);
-        // third phase: compute the error for the xnext array
+        
+        // second barrier
+
+        // third phase: compute the error for the current iteration
         compute_error(info);
+
+        // third barrier
     }
     return 0;
 }
@@ -336,65 +338,68 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     // while the error is greater than the epsilon specified and the number of iteration is less than the specified one maxiter...
     while (!terminated) {
         xpthread_mutex_lock(&de_mutex, QUI);
-        // wait for the deadend contribute to be computed
+        // wait until the St component has been calculated
         while (idx_de < g->N) {
             xpthread_cond_wait(&de_completed, &de_mutex, QUI);
         }
-        // set up the next phase
+        // prepare for the next phase
         idx_de = 0;
         idx_pr = 0;
         is_de_computed = true;
         is_pr_computed = false;
-        st = (d/g->N)*st;
-        // broadcast the start of the next phase
+        st = (d / g->N) * st;
+        // notify the start of the second phase (pagerank computation)
         xpthread_cond_broadcast(&barrier1, QUI);
         xpthread_mutex_unlock(&de_mutex, QUI);
 
         xpthread_mutex_lock(&pr_mutex, QUI);
-        // wait for the pagerank iteration to be completed
+        // wait until the Xnext array has been computed
         while (idx_pr < g->N) {
             xpthread_cond_wait(&pr_completed, &pr_mutex, QUI);
         }
-        // set up the final phase of the current iteration
+        // prepare for the next phase 
         idx_error = 0;
         idx_pr = 0;
         is_pr_computed = true;
         is_error_computed = false;
-        // broadcast the start of the next iteration
+        // notify the start of the third phase (error computation)
         xpthread_cond_broadcast(&barrier2, QUI);
         xpthread_mutex_unlock(&pr_mutex, QUI);
 
         xpthread_mutex_lock(&error_mutex, QUI);
-        // wait for the error to be calculated
+        // wait until the error has been calculated
         while (idx_error < g->N) {
             xpthread_cond_wait(&error_completed, &error_mutex, QUI);
         }
-        // set up the start of the next iteration
+        // prepare for the next iteration
         idx_de = 0;
         idx_error = 0;
         is_error_computed = true;
         is_de_computed = false;
         (*numiter)++;
-
+        // check if the computation has to end
         if (error <= eps || (*numiter) >= maxiter) {
             terminated = true;
+            // wake up any remaining threads waiting on conditions
+            xpthread_cond_broadcast(&barrier1, QUI);
+            xpthread_cond_broadcast(&barrier2, QUI);
+            xpthread_cond_broadcast(&barrier3, QUI);
         }
-        // set the current array to the old one
+
         for (int i = 0; i < g->N; i++) {
             x[i] = xnext[i];
         }
         st = 0;
         error = 0;
-        // broadcast the start of the new iteration
+        // notify the start of the next iteration
         xpthread_cond_broadcast(&barrier3, QUI);
         xpthread_mutex_unlock(&error_mutex, QUI);
     }
 
-
-    // wait for all the threads to terminate execution
     for (int i = 0; i < taux; i++) {
         xpthread_join(threads[i], NULL, QUI);
     }
+
     pthread_kill(*sig_manager, SIGUSR2); // signal the end of the pagerank computation
     xpthread_join(*sig_manager, NULL, QUI);
 
