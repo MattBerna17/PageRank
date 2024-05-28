@@ -66,19 +66,23 @@ typedef struct compute_info {
     double *y;                                  // array Y(t)
     double *xnext;                              // array X(t+1)
     int n;                                      // number of elements of the arrays X, Y, Xnext
+    bool *terminated;                           // true if the computation has terminated, false otherwise
+    
+    double *st;                                 // st value calculated by the threads
+    pthread_cond_t *start_deadend;
+    pthread_cond_t *end_deadend;
+    int *de_pos;
+    bool *deadend_terminated;
+    pthread_mutex_t *mutex_deadend;
 
-    // condition variables to notify the start and end of error computation
-    pthread_cond_t *start_error_computation;
-    pthread_cond_t *end_error_computation;
-    // condition variables to notify the start and end of Y(t+1) computation
-    pthread_cond_t *start_y_computation;
-    pthread_cond_t *end_y_computation;
-    // condition variables to notify the start and end of S_t computation
-    pthread_cond_t *start_deadend_computation;
-    pthread_cond_t *end_deadend_computation;
-    int start_index_x;                          // starting index of the portion of array assigned to this thread (for error, Y(t) and St)
-    int end_index_x;                            // ending index of the portion of array assigned to this thread (for error, Y(t) and St)
-    double *error_calculated;                   // value of error calculated by the thread in his portion of the array
+    pthread_cond_t *barrier1;
+    pthread_cond_t *barrier2;
+
+    bool *pagerank_terminated;
+
+
+    bool *is_iter_terminated;
+
 } compute_info;
 
 

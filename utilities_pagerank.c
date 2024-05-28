@@ -148,6 +148,7 @@ void *compute_pagerank(void *arg) {
         }
         xpthread_mutex_unlock(info->mutex, QUI);
     }
+
     return 0;
 }
 
@@ -191,12 +192,20 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     int n_computed = 0;
     int position = 0;
-    pthread_cond_t start_error_computation = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t end_error_computation = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t start_y_computation = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t end_y_computation = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t start_deadend_computation = PTHREAD_COND_INITIALIZER;
-    pthread_cond_t end_deadend_computation = PTHREAD_COND_INITIALIZER;
+    bool terminated = false; // pagerank computation terminated?
+    
+    double st = 0.0;
+    pthread_cond_t start_deadend = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t end_deadend = PTHREAD_COND_INITIALIZER;
+    int de_pos = 0;
+    bool deadend_terminated = false;
+    pthread_mutex_t mutex_deadend = PTHREAD_MUTEX_INITIALIZER;
+
+    pthread_cond_t barrier1 = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t barrier2 = PTHREAD_COND_INITIALIZER;
+
+    bool pagerank_terminated = false;
+    bool is_iter_terminated = false;
 
     // set up information for the auxiliary threads
     for (int i = 0; i < taux; i++) {
@@ -212,19 +221,25 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         infos[i].y = y;
         infos[i].xnext = xnext;
         infos[i].n = g->N;
+        infos[i].terminated = &terminated;
 
-        infos[i].start_error_computation = &start_error_computation;
-        infos[i].end_error_computation = &end_error_computation;
-        infos[i].start_y_computation = &start_y_computation;
-        infos[i].end_y_computation = &end_y_computation;
-        infos[i].start_deadend_computation = &start_deadend_computation;
-        infos[i].end_deadend_computation = &end_deadend_computation;
-        infos[i].start_index_x = (i/taux)*g->N;
-        infos[i].end_index_x = ((i+1)/taux)*g->N;
+        infos[i].st = &st;
+        infos[i].start_deadend = &start_deadend;
+        infos[i].end_deadend = &end_deadend;
+        infos[i].de_pos = &de_pos;
+        infos[i].deadend_terminated = &deadend_terminated;
+        infos[i].mutex_deadend = &mutex_deadend;
+
+        infos[i].barrier1 = &barrier1;
+        infos[i].barrier2 = &barrier2;
+
+        infos[i].pagerank_terminated = &pagerank_terminated;
+        
+        infos[i].is_iter_terminated = &is_iter_terminated;
+        
         xpthread_create(&threads[i], NULL, &compute_pagerank, &infos[i], QUI);
     }
 
-    bool terminated = false; // pagerank computation terminated?
 
     
     // create the SIGUSR1 manager thread
@@ -275,22 +290,28 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         double error = compute_error(xnext, x, infos->n);
         
         
-        // set the calculated array to the previous
+        
         for (int i = 0; i < g->N; i++)  {
             x[i] = xnext[i];
-        };
+        }; // set the calculated array to the previous
         position = 0; // reset the position
         n_computed = 0; // reset the computed counter to 0
         // calculate error
         (*numiter)++;
         if (*numiter == maxiter || error <= eps) {
             // warn the consumer threads that the computation has come to an end by sending an array of -1 elements
-            x[0] = -1.0;
+            for (int i = 0; i < g->N; i++) {
+                x[i] = -1.0;
+            }
             terminated = true;
         }
         xpthread_cond_broadcast(&start_pagerank_computation, QUI);
         xpthread_mutex_unlock(&mutex, QUI);
     }
+
+
+
+
 
     // wait for all the threads to terminate execution
     for (int i = 0; i < taux; i++) {
