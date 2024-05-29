@@ -6,7 +6,10 @@
  * @brief Data structure to store a tree in the graph
  * 
  */
-typedef node *inmap;
+typedef struct inmap {
+    node *list;
+    pthread_mutex_t *list_mutex;
+} inmap;
 
 
 /**

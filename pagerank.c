@@ -126,12 +126,15 @@ int main(int argc, char* argv[]) {
                     printerr("[ERROR]: malloc not succeded. Terminating", HERE);
                 }
                 inmap *in = malloc(sizeof(inmap)*g->N);
+
                 if (in == NULL) {
                     printerr("[ERROR]: malloc not succeded. Terminating", HERE);
                 }
                 for (int i = 0; i < g->N; i++) {
                     out[i] = 0;
-                    in[i] = NULL;
+                    in[i].list = NULL;
+                    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+                    in[i].list_mutex = &mutex;
                 }
                 g->out = out;
                 g->in = in;
@@ -260,7 +263,7 @@ int main(int argc, char* argv[]) {
     xpthread_cond_destroy(&canwrite, QUI);
     free(line);
     for (int i = 0; i < g->N; i++) {
-        clear(g->in[i]);
+        clear(g->in[i].list);
     }
     free(g->in);
     free(g->out);

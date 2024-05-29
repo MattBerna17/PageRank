@@ -66,7 +66,7 @@ void *manage_edges(void *arg) {
                     printerr("[ERROR]: edge source or destination out of legal range. Terminating.", HERE);
                 }
                 
-                bool added = add(&info->g->in[curr_edge->dest], curr_edge->src);
+                bool added = add(&info->g->in[curr_edge->dest].list, curr_edge->src);
                 // bool added = true;
                 
                 // if succeeded to add, increment number of out edges from src
@@ -107,7 +107,7 @@ void *manage_edges(void *arg) {
 
 double compute_sum_y(graph *g, double *y, int j) {
     double sum = 0.0;
-    node *current = g->in[j];
+    node *current = g->in[j].list;
 
     // Array per simulare la pila
     node **stack = (node**)malloc(g->N * sizeof(node*));
