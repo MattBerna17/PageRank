@@ -37,15 +37,20 @@ void *manage_signal(void *arg) {
 
 void *manage_edges(void *arg) {
     input_info *info = (input_info *)arg;
+    
     while (true) {
         xpthread_mutex_lock(info->mutex, QUI);
+        
         while((*info->available) == 0) {
             xpthread_cond_wait(info->canread, info->mutex, QUI);
         }
+        
         // at least 1 available edge in arr
         edge *curr_edge = info->arr[(*info->position) % info->n];
         (*info->available)--;
         (*info->position)++;
+        
+        
         // check on the edge
         if (curr_edge == NULL) {
             // reached end of file, terminate thread execution
@@ -56,15 +61,19 @@ void *manage_edges(void *arg) {
         } else {
             // if the edge is from a node to itself, continue
             if (curr_edge->src != curr_edge->dest) {
-                // else, add the node in the inmap structure
                 // check whether the edge is legal or not, else terminate the program
                 if (curr_edge->src < 0 || curr_edge->dest > info->g->N - 1) {
                     printerr("[ERROR]: edge source or destination out of legal range. Terminating.", HERE);
                 }
+                
                 bool added = add(&info->g->in[curr_edge->dest], curr_edge->src);
-                // if succeded to add, increment number of out edges from src
+                // bool added = true;
+                
+                // if succeeded to add, increment number of out edges from src
                 if (added) {
+                    // xpthread_mutex_lock(info->mutex, QUI);
                     info->g->out[curr_edge->src]++;
+                    // xpthread_mutex_unlock(info->mutex, QUI);
                 }
             }
             free(curr_edge);
@@ -76,23 +85,96 @@ void *manage_edges(void *arg) {
 }
 
 
-double aux(graph *g, double *x, inmap *n) {
-    if ((*n) == NULL) {
-        return 0;
-    } else if (g->out[(*n)->val] > 0) {
-        return x[(*n)->val]/g->out[(*n)->val] + aux(g, x, &(*n)->left) + aux(g, x, &(*n)->right);
+
+// double aux(graph *g, double *x, inmap *n) {
+//     if ((*n) == NULL) {
+//         return 0;
+//     } else if (g->out[(*n)->val] > 0) {
+//         return x[(*n)->val]/g->out[(*n)->val] + aux(g, x, &(*n)->left) + aux(g, x, &(*n)->right);
+//     }
+//     return 0.0;
+// }
+
+
+// double compute_y(graph *g, double *x, int j, double d) {
+//     double y = 0;
+//     inmap *n = &(g->in[j]);
+//     y += aux(g, x, n);
+//     return y;
+// }
+
+
+
+double compute_sum_y(graph *g, double *y, int j) {
+    double sum = 0.0;
+    node *current = g->in[j];
+
+    // Array per simulare la pila
+    node **stack = (node**)malloc(g->N * sizeof(node*));
+    int top = -1; // Indice per la cima della pila
+
+    // Inizializzazione: spingere il nodo iniziale sulla pila
+    if (current != NULL) {
+        stack[++top] = current;
     }
-    return 0.0;
+
+    // Iterazione finché la pila non è vuota
+    while (top >= 0) {
+        current = stack[top--]; // Pop dalla pila
+
+        // Aggiungere il valore di y corrispondente
+        sum += y[current->val];
+
+        // Spingere i figli destro e sinistro sulla pila
+        if (current->right != NULL) {
+            stack[++top] = current->right;
+        }
+        if (current->left != NULL) {
+            stack[++top] = current->left;
+        }
+    }
+
+    free(stack); // Liberare la memoria della pila
+    return sum;
 }
 
 
-double compute_y(graph *g, double *x, int j, double d) {
-    double y = 0;
-    inmap *n = &(g->in[j]);
-    y += aux(g, x, n);
-    return y;
-}
+// double aux(inmap node, double *y) {
+//     if (node == NULL) return 0.0;
+//     return y[(*node).val] + aux((*node).left, y) + aux((*node).right, y);
+// }
 
+
+// double compute_sum_y(graph *g, double *y, int j) {
+//     return aux(g->in[j], y);
+// }
+
+
+
+void compute_y(compute_info *info) {
+    xpthread_mutex_lock(info->y_mutex, QUI);
+    while (true) {
+        // wait on the first barrier until the main thread starts the next phase or until the computation has ended
+        while (*info->idx_y == info->g->N && !(*info->terminated)) {
+            xpthread_cond_wait(info->barrier0, info->y_mutex, QUI);
+        }
+        // if the deadend has been computed or the overall computation has ended, unlock and exit the function
+        if (*info->is_y_computed || *info->terminated) {
+            xpthread_mutex_unlock(info->y_mutex, QUI);
+            return;
+        }
+
+        // compute Y_i
+        info->y[(*info->idx_y) % info->g->N] = info->x[(*info->idx_y) % info->g->N]/info->g->out[(*info->idx_y) % info->g->N];
+
+        (*info->idx_y)++; // increment the value
+        // signal if the analyzed element was the last node
+        if (*info->idx_y == info->g->N) {
+            xpthread_cond_signal(info->y_completed, QUI);
+        }
+    }
+    xpthread_mutex_unlock(info->y_mutex, QUI);
+}
 
 
 
@@ -145,7 +227,7 @@ void compute_pr(compute_info *info) {
             return;
         }
         // compute the y element
-        double sum_y = compute_y(info->g, info->x, (*info->idx_pr) % info->g->N, info->d);
+        double sum_y = compute_sum_y(info->g, info->y, (*info->idx_pr) % info->g->N);
         // compute xnext value
         info->xnext[(*info->idx_pr) % info->g->N] = info->teleport + info->d * sum_y + (*info->st);
         (*info->idx_pr)++; // increment the index of the pagerank
@@ -196,6 +278,11 @@ void *tbody(void *arg) {
     compute_info *info = (compute_info *) arg;
     // repeat these 3 computations until the main signals the end of the computation
     while (!(*info->terminated)) {
+        // zero phase: compute Y_i for the current iteration
+        compute_y(info);
+
+        // zero barrier
+
         // first phase: compute St for the current iteration
         compute_st(info);
 
@@ -262,6 +349,13 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     double st = 0.0;
     int idx_de = 0;
 
+    pthread_mutex_t y_mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t y_completed = PTHREAD_COND_INITIALIZER;
+    pthread_cond_t barrier0 = PTHREAD_COND_INITIALIZER;
+    bool is_y_computed = false;
+    // double st = 0.0;
+    int idx_y = 0;
+
     pthread_mutex_t pr_mutex = PTHREAD_MUTEX_INITIALIZER;
     pthread_cond_t pr_completed = PTHREAD_COND_INITIALIZER;
     pthread_cond_t barrier2 = PTHREAD_COND_INITIALIZER;
@@ -280,6 +374,12 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     for (int i = 0; i < taux; i++) {
         infos[i].terminated = &terminated;
         infos[i].g = g;
+
+        infos[i].y_mutex = &y_mutex;
+        infos[i].y_completed = &y_completed;
+        infos[i].barrier0 = &barrier0;
+        infos[i].is_y_computed = &is_y_computed;
+        infos[i].idx_y = &idx_y;
 
         infos[i].de_mutex = &de_mutex;
         infos[i].de_completed = &de_completed;
@@ -337,6 +437,20 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
 
     // while the error is greater than the epsilon specified and the number of iteration is less than the specified one maxiter...
     while (!terminated) {
+        xpthread_mutex_lock(&y_mutex, QUI);
+        // wait until the Y array has been calculated
+        while (idx_y < g->N) {
+            xpthread_cond_wait(&y_completed, &y_mutex, QUI);
+        }
+        // prepare for the next phase
+        idx_y = 0;
+        idx_de = 0;
+        is_y_computed = true;
+        is_de_computed = false;
+        // notify the start of the first phase (St computation)
+        xpthread_cond_broadcast(&barrier0, QUI);
+        xpthread_mutex_unlock(&y_mutex, QUI);
+
         xpthread_mutex_lock(&de_mutex, QUI);
         // wait until the St component has been calculated
         while (idx_de < g->N) {
@@ -372,21 +486,22 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
             xpthread_cond_wait(&error_completed, &error_mutex, QUI);
         }
         // prepare for the next iteration
-        idx_de = 0;
+        idx_y = 0;
         idx_error = 0;
         is_error_computed = true;
-        is_de_computed = false;
+        is_y_computed = false;
         (*numiter)++;
-        printf("---------- ITER %d ----------\n", *numiter);
-        printf("st = %f\n\n", st);
-        for (int i = 0; i < g->N; i++) {
-            printf("X[%d] = %f\n", i, xnext[i]);
-        }
-        printf("\n\n");
+        // printf("---------- ITER %d ----------\n", *numiter);
+        // printf("st = %f\n\n", st);
+        // for (int i = 0; i < g->N; i++) {
+        //     printf("X[%d] = %f\n", i, xnext[i]);
+        // }
+        // printf("\n\n");
         // check if the computation has to end
         if (error <= eps || (*numiter) >= maxiter) {
             terminated = true;
             // wake up any remaining threads waiting on conditions
+            xpthread_cond_broadcast(&barrier0, QUI);
             xpthread_cond_broadcast(&barrier1, QUI);
             xpthread_cond_broadcast(&barrier2, QUI);
             xpthread_cond_broadcast(&barrier3, QUI);

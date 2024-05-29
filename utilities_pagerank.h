@@ -56,6 +56,13 @@ typedef struct compute_info {
     bool *terminated;
     graph *g;
 
+    pthread_mutex_t *y_mutex;
+    pthread_cond_t *y_completed;
+    pthread_cond_t *barrier0;
+    bool *is_y_computed;
+    // double *y;
+    int *idx_y;
+
     pthread_mutex_t *de_mutex;
     pthread_cond_t *de_completed;
     pthread_cond_t *barrier1;
