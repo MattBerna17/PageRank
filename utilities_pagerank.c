@@ -377,6 +377,12 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         is_error_computed = true;
         is_de_computed = false;
         (*numiter)++;
+        printf("---------- ITER %d ----------\n", *numiter);
+        printf("st = %f\n\n", st);
+        for (int i = 0; i < g->N; i++) {
+            printf("X[%d] = %f\n", i, xnext[i]);
+        }
+        printf("\n\n");
         // check if the computation has to end
         if (error <= eps || (*numiter) >= maxiter) {
             terminated = true;
