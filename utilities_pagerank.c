@@ -49,13 +49,13 @@ void *manage_edges(void *arg) {
         edge *curr_edge = info->arr[(*info->position) % info->n];
         (*info->available)--;
         (*info->position)++;
+        xpthread_cond_signal(info->canwrite, HERE);
+        xpthread_mutex_unlock(info->mutex, HERE);
         
         // check on the edge
         if (curr_edge == NULL) {
             // reached end of file, terminate thread execution
             free(curr_edge);
-            xpthread_cond_signal(info->canwrite, HERE);
-            xpthread_mutex_unlock(info->mutex, HERE);
             break;
         } else {
             // if the edge is from a node to itself, continue
@@ -70,12 +70,12 @@ void *manage_edges(void *arg) {
                 
                 // if succeeded to add, increment number of out edges from src
                 if (added) {
+                    xpthread_mutex_lock(info->mutex, HERE);
                     info->g->out[curr_edge->src]++;
+                    xpthread_mutex_unlock(info->mutex, HERE);
                 }
             }
             free(curr_edge);
-            xpthread_cond_signal(info->canwrite, HERE);
-            xpthread_mutex_unlock(info->mutex, HERE);
         }
     }
     return 0; // not using pthread_exit(NULL) since valgrind recognizes it as "still reachable"
