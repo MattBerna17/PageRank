@@ -10,7 +10,7 @@ typedef struct node {
     int val;                // index of the node
     struct node* left;      // pointer to the left child
     struct node* right;     // pointer to the right child
-    // pthread_mutex_t lock;   // mutex for the node
+    pthread_mutex_t lock;   // mutex for the node
 } node;
 
 
