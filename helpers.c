@@ -1,8 +1,8 @@
 #include "helpers.h"
-#define HERE __FILE__, __LINE__
+#define HERE __LINE__, __FILE__
 
 
-void printerr(char *msg, char *file, int line) {
+void printerr(char *msg, int line, char *file) {
     fprintf(stderr, "\n===================  ERROR AT FILE %s, LINE %d  ===================\n", file, line);
     fprintf(stderr, "%s\n\n", msg);
     exit(1);

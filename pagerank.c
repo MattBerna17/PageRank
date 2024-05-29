@@ -1,6 +1,5 @@
 #include "utilities_pagerank.h"
-#define HERE __FILE__, __LINE__
-#define QUI __LINE__, __FILE__
+#define HERE __LINE__, __FILE__
 
 
 
@@ -96,7 +95,7 @@ int main(int argc, char* argv[]) {
         infos[i].available = &available;
         infos[i].position = &cons_position;
         
-        xpthread_create(&threads[i], NULL, &manage_edges, &infos[i], QUI);
+        xpthread_create(&threads[i], NULL, &manage_edges, &infos[i], HERE);
     }
 
 
@@ -139,6 +138,8 @@ int main(int argc, char* argv[]) {
                 g->out = out;
                 g->in = in;
                 init_line_read = true;
+                pthread_mutex_t graph_lock = PTHREAD_MUTEX_INITIALIZER;
+                g->graph_lock = &graph_lock;
             }
         } else {
             printerr("[ERROR]: Formatting error in the input file. Terminating.", HERE);
@@ -190,21 +191,21 @@ int main(int argc, char* argv[]) {
         //     printerr("[ERROR]: Error during file read. Terminating.", HERE);
         // }
         // get the mutex to write on the buffer
-        xpthread_mutex_lock(&mutex, QUI);
+        xpthread_mutex_lock(&mutex, HERE);
         // if the buffer is full, wait until at least one element is free
         while (available == n) {
-            xpthread_cond_wait(&canwrite, &mutex, QUI);
+            xpthread_cond_wait(&canwrite, &mutex, HERE);
         }
         // add the edge in the buffer
         arr[prod_position % n] = curr_edge;
         prod_position++;
         available++;
-        xpthread_cond_signal(&canread, QUI); // notify the consumers that an edge is available
-        xpthread_mutex_unlock(&mutex, QUI);
+        xpthread_cond_signal(&canread, HERE); // notify the consumers that an edge is available
+        xpthread_mutex_unlock(&mutex, HERE);
     }
 
     for (int i = 0; i < t; i++) {
-        xpthread_join(threads[i], NULL, QUI);
+        xpthread_join(threads[i], NULL, HERE);
     }
     
     // print the infos after the buffer communication
@@ -258,9 +259,9 @@ int main(int argc, char* argv[]) {
 
 
     // free all the memory allocated and destroy condition variables and mutex
-    xpthread_mutex_destroy(&mutex, QUI);
-    xpthread_cond_destroy(&canread, QUI);
-    xpthread_cond_destroy(&canwrite, QUI);
+    xpthread_mutex_destroy(&mutex, HERE);
+    xpthread_cond_destroy(&canread, HERE);
+    xpthread_cond_destroy(&canwrite, HERE);
     free(line);
     for (int i = 0; i < g->N; i++) {
         clear(g->in[i].list);

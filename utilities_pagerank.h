@@ -21,6 +21,7 @@ typedef struct graph {
     int N;          // number of nodes in the graph
     int *out;       // array with the number of exiting edges for each node
     inmap *in;     // array of entering edges for each node
+    pthread_mutex_t *graph_lock;
 } graph;
 
 

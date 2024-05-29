@@ -22,7 +22,7 @@ typedef struct node {
  * @param file file containing the error
  * @param line line that caused the error
  */
-void printerr(char *msg, char *file, int line);
+void printerr(char *msg, int line, char *file);
 
 /**
  * @brief Function to read a line from the specified file
