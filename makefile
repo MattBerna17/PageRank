@@ -19,6 +19,6 @@ all: $(EXECS)
 # %.o: %.c xerrori.h utilities_pagerank.h helpers.h
 # 	$(CC) $(CFLAGS) -c $<
 
-# clean: 
-# 	rm -f *.o $(EXECS)
+clean: 
+	rm -f *.o $(EXECS)
 
