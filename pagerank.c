@@ -1,6 +1,5 @@
 #include "utilities_pagerank.h"
-#define HERE __FILE__, __LINE__
-#define QUI __LINE__, __FILE__
+#define HERE __LINE__, __FILE__
 
 
 
@@ -12,7 +11,6 @@ int main(int argc, char* argv[]) {
     double e = 1.e-7;
     char *infile;
 
-    // : --> needs an argument.
     while((opt = getopt(argc, argv, "k:m:d:e:t:h")) != -1) {
         switch (opt) {
             case 'k':
@@ -53,6 +51,7 @@ int main(int argc, char* argv[]) {
         printerr("[ERROR]: Bad file name. Terminating.", HERE);
     }
 
+    // block incoming SIGUSR1 and SIGUSR2 signals (the signal manager thread handles them)
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGUSR1);
@@ -64,7 +63,7 @@ int main(int argc, char* argv[]) {
     pthread_cond_t canread = PTHREAD_COND_INITIALIZER;
     pthread_cond_t canwrite = PTHREAD_COND_INITIALIZER;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    graph *g = malloc(sizeof(graph));
+    grafo *g = malloc(sizeof(grafo));
     if (g == NULL) {
         printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
@@ -96,7 +95,7 @@ int main(int argc, char* argv[]) {
         infos[i].available = &available;
         infos[i].position = &cons_position;
         
-        xpthread_create(&threads[i], NULL, &manage_edges, &infos[i], QUI);
+        xpthread_create(&threads[i], NULL, &manage_edges, &infos[i], HERE);
     }
 
 
@@ -121,9 +120,9 @@ int main(int argc, char* argv[]) {
                 v = strtok(NULL, " "); // skip the number of edges
 
                 g->N = r; // number of nodes
-                int *out = malloc(sizeof(int)*g->N); // define the array containing the number of out edges of each node
+                int *out = calloc(g->N, sizeof(int)); // define the array containing the number of out edges of each node
                 if (out == NULL) {
-                    printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+                    printerr("[ERROR]: calloc not succeded. Terminating", HERE);
                 }
                 inmap *in = malloc(sizeof(inmap)*g->N);
 
@@ -131,10 +130,7 @@ int main(int argc, char* argv[]) {
                     printerr("[ERROR]: malloc not succeded. Terminating", HERE);
                 }
                 for (int i = 0; i < g->N; i++) {
-                    out[i] = 0;
-                    in[i].list = NULL;
-                    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-                    in[i].list_mutex = &mutex;
+                    in[i] = NULL;
                 }
                 g->out = out;
                 g->in = in;
@@ -148,63 +144,38 @@ int main(int argc, char* argv[]) {
 
     int terminated_threads = 0; // counter for terminated threads
     int i, j;
-    int nline = 0;
     while(terminated_threads < t) {
         edge *curr_edge = malloc(sizeof(edge));
         if (curr_edge == NULL) {
             printerr("[ERROR]: malloc not succeded. Terminating", HERE);
         }
         int e = fscanf(in, "%d %d", &i, &j);
-        nline++;
+        // if the file has ended, send the NULL edge t times (each thread reads it and stops its read phase)
         if (e == EOF) {
             free(curr_edge);
             curr_edge = NULL;
-            terminated_threads++; // count the number of thread ended
+            terminated_threads++; // increment the number of thread ended
         } else if (e == 2) {
-            // if (nline % 100000 == 0) {
-            //     printf("\n\nline = %d\nedge = (%d, %d)\n\n", nline, i, j);
-            // }
             curr_edge->src = i - 1;
             curr_edge->dest = j - 1;
-            // printf("Letto (%d, %d)\n", i, j);
         } else {
             printerr("[ERROR]: Error during file read. Terminating.", HERE);
         }
-        // int e = read_line(&line, &length, in); // read line from the file
-        // if (e == 1) {
-        //     // the line contains i j, the edge from i to j
-        //     // tokenize the string using the space separator
-        //     char *v = strtok(line, " ");
-        //     int i = atoi(v);
-        //     v = strtok(NULL, " ");
-        //     int j = atoi(v);
-        //     curr_edge->src = i - 1;
-        //     curr_edge->dest = j - 1;
-
-        // } else if (e == 0) {
-        //     // end of file, notify threads by sending the special edge NULL
-        //     free(curr_edge);
-        //     curr_edge = NULL;
-        //     terminated_threads++; // count the number of thread ended
-        // } else {
-        //     printerr("[ERROR]: Error during file read. Terminating.", HERE);
-        // }
-        // get the mutex to write on the buffer
-        xpthread_mutex_lock(&mutex, QUI);
+        xpthread_mutex_lock(&mutex, HERE);
         // if the buffer is full, wait until at least one element is free
         while (available == n) {
-            xpthread_cond_wait(&canwrite, &mutex, QUI);
+            xpthread_cond_wait(&canwrite, &mutex, HERE);
         }
         // add the edge in the buffer
         arr[prod_position % n] = curr_edge;
         prod_position++;
         available++;
-        xpthread_cond_signal(&canread, QUI); // notify the consumers that an edge is available
-        xpthread_mutex_unlock(&mutex, QUI);
+        xpthread_cond_signal(&canread, HERE); // notify the consumers that an edge is available
+        xpthread_mutex_unlock(&mutex, HERE);
     }
 
     for (int i = 0; i < t; i++) {
-        xpthread_join(threads[i], NULL, QUI);
+        xpthread_join(threads[i], NULL, HERE);
     }
     
     // print the infos after the buffer communication
@@ -258,12 +229,12 @@ int main(int argc, char* argv[]) {
 
 
     // free all the memory allocated and destroy condition variables and mutex
-    xpthread_mutex_destroy(&mutex, QUI);
-    xpthread_cond_destroy(&canread, QUI);
-    xpthread_cond_destroy(&canwrite, QUI);
+    xpthread_mutex_destroy(&mutex, HERE);
+    xpthread_cond_destroy(&canread, HERE);
+    xpthread_cond_destroy(&canwrite, HERE);
     free(line);
     for (int i = 0; i < g->N; i++) {
-        clear(g->in[i].list);
+        clear(g->in[i]);
     }
     free(g->in);
     free(g->out);

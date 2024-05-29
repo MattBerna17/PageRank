@@ -19,10 +19,10 @@ typedef struct node {
  * @brief Helper function to print errors
  * 
  * @param msg message to print
- * @param file file containing the error
  * @param line line that caused the error
+ * @param file file containing the error
  */
-void printerr(char *msg, char *file, int line);
+void printerr(char *msg, int line, char *file);
 
 /**
  * @brief Function to read a line from the specified file

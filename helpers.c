@@ -1,8 +1,8 @@
 #include "helpers.h"
-#define HERE __FILE__, __LINE__
+#define HERE __LINE__, __FILE__
 
 
-void printerr(char *msg, char *file, int line) {
+void printerr(char *msg, int line, char *file) {
     fprintf(stderr, "\n===================  ERROR AT FILE %s, LINE %d  ===================\n", file, line);
     fprintf(stderr, "%s\n\n", msg);
     exit(1);
@@ -28,11 +28,14 @@ int read_line(char** line, size_t *length, FILE *f) {
 
 bool add(node** t, int val) {
     // create the node for the new value
-    node *new_node = (node*) malloc(sizeof(node));
+    node *new_node = malloc(sizeof(node));
+    if (new_node == NULL) {
+        printerr("[ERROR] malloc failed. Terminating.", HERE);
+    }
     new_node->val = val;
     new_node->left = NULL;
     new_node->right = NULL;
-    pthread_mutex_init(&(new_node->lock), NULL);
+    xpthread_mutex_init(&(new_node->lock), NULL, HERE);
 
     // if the tree is empty, place the node as the root node
     if (*t == NULL) {
@@ -41,29 +44,32 @@ bool add(node** t, int val) {
     }
 
     node* current = *t;
-    node* parent = NULL;
 
     pthread_mutex_lock(&(current->lock));
-
+    // else, iteratively scan the BST to find or add the value
     while (current != NULL) {
-        parent = current;
-
         if (val < current->val) {
+            // the value goes to the left of the current node
             if (current->left != NULL) {
+                // if the left node is not NULL, go to the left
                 pthread_mutex_lock(&(current->left->lock));
                 pthread_mutex_unlock(&(current->lock));
                 current = current->left;
             } else {
+                // if the left node is NULL, place it there and return true
                 current->left = new_node;
                 pthread_mutex_unlock(&(current->lock));
                 return true;
             }
         } else if (val > current->val) {
+            // the value goes to the right of the current node
             if (current->right != NULL) {
+                // if the right node is not NULL, go to the right
                 pthread_mutex_lock(&(current->right->lock));
                 pthread_mutex_unlock(&(current->lock));
                 current = current->right;
             } else {
+                // if the right node is NULL, place it and return true
                 current->right = new_node;
                 pthread_mutex_unlock(&(current->lock));
                 return true;
