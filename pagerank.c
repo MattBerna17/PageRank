@@ -132,14 +132,14 @@ int main(int argc, char* argv[]) {
                 for (int i = 0; i < g->N; i++) {
                     out[i] = 0;
                     in[i].list = NULL;
-                    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-                    in[i].list_mutex = &mutex;
+                    in[i].list_mutex = malloc(sizeof(pthread_mutex_t));
+                    xpthread_mutex_init(in[i].list_mutex, NULL, HERE);
                 }
                 g->out = out;
                 g->in = in;
                 init_line_read = true;
-                pthread_mutex_t graph_lock = PTHREAD_MUTEX_INITIALIZER;
-                g->graph_lock = &graph_lock;
+                g->graph_lock = malloc(sizeof(pthread_mutex_t));
+                xpthread_mutex_init(g->graph_lock, NULL, HERE);
             }
         } else {
             printerr("[ERROR]: Formatting error in the input file. Terminating.", HERE);
@@ -265,9 +265,11 @@ int main(int argc, char* argv[]) {
     free(line);
     for (int i = 0; i < g->N; i++) {
         clear(g->in[i].list);
+        free(g->in[i].list_mutex);
     }
     free(g->in);
     free(g->out);
+    free(g->graph_lock);
     free(arr);
     fclose(in);
     free(infile);
