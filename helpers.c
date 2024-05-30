@@ -26,22 +26,36 @@ int read_line(char** line, size_t *length, FILE *f) {
 
 
 bool add(node** t, int val) {
-    // Allocazione di memoria per il nuovo nodo
-    node* new_node = (node*)malloc(sizeof(node));
-    if (new_node == NULL) {
-        // Se l'allocazione della memoria fallisce, ritorna false
-        return false;
+    node* current = *t;
+    node* prev = NULL;
+
+    // Scorriamo la lista per trovare la posizione corretta per inserire l'elemento
+    while (current != NULL && current->val > val) {
+        prev = current;
+        current = current->next;
     }
 
-    // Assegna il valore al nuovo nodo
-    new_node->val = val;
-    // Imposta il puntatore next del nuovo nodo al primo nodo corrente della lista
-    new_node->next = *t;
-    // Aggiorna il puntatore t per puntare al nuovo nodo
-    *t = new_node;
+    // Se troviamo un nodo con lo stesso valore, non aggiungiamo nulla
+    if (current != NULL && current->val == val) {
+        return false; // Elemento già presente
+    }
 
-    // Ritorna true per indicare che l'operazione è andata a buon fine
-    return true;
+    // Creiamo un nuovo nodo
+    node* new_node = (node*)malloc(sizeof(node));
+    if (new_node == NULL) {
+        return false; // Errore nell'allocazione della memoria
+    }
+    new_node->val = val;
+    new_node->next = current;
+
+    // Se prev è NULL, significa che dobbiamo inserire il nuovo nodo all'inizio della lista
+    if (prev == NULL) {
+        *t = new_node;
+    } else {
+        prev->next = new_node;
+    }
+
+    return true; // Elemento aggiunto con successo
 }
 
 
