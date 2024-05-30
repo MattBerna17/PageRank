@@ -124,12 +124,8 @@ double compute_sum_y(graph *g, double *y, int j) {
         // Aggiungere il valore di y corrispondente
         sum += y[current->val];
 
-        // Spingere i figli destro e sinistro sulla pila
-        if (current->right != NULL) {
-            stack[++top] = current->right;
-        }
-        if (current->left != NULL) {
-            stack[++top] = current->left;
+        if (current->next != NULL) {
+            stack[++top] = current->next;
         }
     }
 
