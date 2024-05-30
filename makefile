@@ -1,24 +1,18 @@
 CC=gcc
-CFLAGS=-std=c11 -Wall -g -O -pthread -pg
+CFLAGS=-std=c11 -Wall -g -O -pthread
 LDLIBS=-lm -lrt -pthread
 
-EXECS=pagerank.out
+EXECS=pagerank
+OBJS=pagerank.o xerrori.o utilities_pagerank.o helpers.o
 
 all: $(EXECS)
 
-
-%.out: %.o xerrori.o utilities_pagerank.o helpers.o
+$(EXECS): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	rm -f $(OBJS)
 
 %.o: %.c xerrori.h utilities_pagerank.h helpers.h
 	$(CC) $(CFLAGS) -c $<
 
-# %.out: %.c xerrori.c utilities_pagerank.c helpers.c
-# 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-
-# %.o: %.c xerrori.h utilities_pagerank.h helpers.h
-# 	$(CC) $(CFLAGS) -c $<
-
-# clean: 
-# 	rm -f *.o $(EXECS)
-
+clean: 
+	rm -f *.o $(EXECS)

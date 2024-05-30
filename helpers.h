@@ -33,19 +33,19 @@ void printerr(char *msg, int line, char *file);
 int read_line(char** line, size_t *length, FILE *f);
 
 /**
- * @brief Function to add a value in the t tree (binary search tree)
+ * @brief Function to add a value in the linked list l
  * 
- * @param t         tree to add the value to
- * @param val       value to add to the tree
- * @return true     if the value is not present in the tree (and the function added it)
- * @return false    if the value was already in the tree
+ * @param l         head of the linked list
+ * @param val       value to add to the list
+ * @return true     if the value is not present in the list (and the function added it)
+ * @return false    if the value was already in the list
  */
-bool add(node** t, int val);
+bool add(node** l, int val);
 
 /**
- * @brief Function to free the tree
+ * @brief Function to free the list
  * 
- * @param t tree to dealloc
+ * @param l list to free
  */
-void clear(node* t);
+void clear(node* l);
 

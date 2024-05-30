@@ -25,47 +25,46 @@ int read_line(char** line, size_t *length, FILE *f) {
 }
 
 
-bool add(node** t, int val) {
-    node* current = *t;
+bool add(node** l, int val) {
+    node* current = *l;
     node* prev = NULL;
 
-    // Scorriamo la lista per trovare la posizione corretta per inserire l'elemento
+    // find the position where to add the new node
     while (current != NULL && current->val > val) {
         prev = current;
         current = current->next;
     }
 
-    // Se troviamo un nodo con lo stesso valore, non aggiungiamo nulla
+    // if the value is in the list, return false
     if (current != NULL && current->val == val) {
-        return false; // Elemento già presente
+        return false;
     }
 
-    // Creiamo un nuovo nodo
     node* new_node = (node*)malloc(sizeof(node));
     if (new_node == NULL) {
-        return false; // Errore nell'allocazione della memoria
+        printerr("[ERROR] malloc not succeded. Terminating.", HERE);
     }
     new_node->val = val;
     new_node->next = current;
 
-    // Se prev è NULL, significa che dobbiamo inserire il nuovo nodo all'inizio della lista
+    // if prev is null, the new node is the head of the list
     if (prev == NULL) {
-        *t = new_node;
+        *l = new_node;
     } else {
         prev->next = new_node;
     }
 
-    return true; // Elemento aggiunto con successo
+    return true;
 }
 
 
 
 
-void clear(node* t) {
-    if (t == NULL) {
+void clear(node* l) {
+    if (l == NULL) {
         return;
     } else {
-        clear(t->next);
-        free(t);
+        clear(l->next);
+        free(l);
     }
 }

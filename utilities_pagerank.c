@@ -68,7 +68,6 @@ void *manage_edges(void *arg) {
                 xpthread_mutex_lock(info->g->in[curr_edge->dest].list_mutex, HERE);
                 bool added = add(&info->g->in[curr_edge->dest].list, curr_edge->src);
                 xpthread_mutex_unlock(info->g->in[curr_edge->dest].list_mutex, HERE);
-                // bool added = true;
                 
                 // if succeeded to add, increment number of out edges from src
                 if (added) {
@@ -85,43 +84,24 @@ void *manage_edges(void *arg) {
 
 
 
-// double aux(graph *g, double *x, inmap *n) {
-//     if ((*n) == NULL) {
-//         return 0;
-//     } else if (g->out[(*n)->val] > 0) {
-//         return x[(*n)->val]/g->out[(*n)->val] + aux(g, x, &(*n)->left) + aux(g, x, &(*n)->right);
-//     }
-//     return 0.0;
-// }
 
-
-// double compute_y(graph *g, double *x, int j, double d) {
-//     double y = 0;
-//     inmap *n = &(g->in[j]);
-//     y += aux(g, x, n);
-//     return y;
-// }
-
-
-
-double compute_sum_y(graph *g, double *y, int j) {
+double compute_sum_y(grafo *g, double *y, int j) {
     double sum = 0.0;
     node *current = g->in[j].list;
 
-    // Array per simulare la pila
+    // array of nodes to simulate the call stack
     node **stack = (node**)malloc(g->N * sizeof(node*));
-    int top = -1; // Indice per la cima della pila
+    int top = -1; // index for the start or the stack
 
-    // Inizializzazione: spingere il nodo iniziale sulla pila
     if (current != NULL) {
         stack[++top] = current;
     }
 
-    // Iterazione finché la pila non è vuota
+    // while the stack contains at least one element...
     while (top >= 0) {
-        current = stack[top--]; // Pop dalla pila
+        current = stack[top--]; // pop from the stack the element
 
-        // Aggiungere il valore di y corrispondente
+        // process it
         sum += y[current->val];
 
         if (current->next != NULL) {
@@ -129,23 +109,16 @@ double compute_sum_y(graph *g, double *y, int j) {
         }
     }
 
-    free(stack); // Liberare la memoria della pila
+    free(stack);
     return sum;
 }
 
 
-// double aux(inmap node, double *y) {
-//     if (node == NULL) return 0.0;
-//     return y[(*node).val] + aux((*node).left, y) + aux((*node).right, y);
-// }
-
-
-// double compute_sum_y(graph *g, double *y, int j) {
-//     return aux(g->in[j], y);
-// }
-
-
-
+/**
+ * @brief Function to compute the Y array
+ * 
+ * @param info data passed by the main thread
+ */
 void compute_y(compute_info *info) {
     xpthread_mutex_lock(info->y_mutex, HERE);
     while (true) {
@@ -303,7 +276,7 @@ void *tbody(void *arg) {
 
 
 
-double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter) {
+double *pagerank(grafo *g, double d, double eps, int maxiter, int taux, int *numiter) {
     // define the 3 used arrays: x, y and xnext
     double *x = malloc(sizeof(double) * g->N);
     if (x == NULL) {
@@ -348,7 +321,6 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
     pthread_cond_t y_completed = PTHREAD_COND_INITIALIZER;
     pthread_cond_t barrier0 = PTHREAD_COND_INITIALIZER;
     bool is_y_computed = false;
-    // double st = 0.0;
     int idx_y = 0;
 
     pthread_mutex_t pr_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -486,12 +458,7 @@ double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *num
         is_error_computed = true;
         is_y_computed = false;
         (*numiter)++;
-        // printf("---------- ITER %d ----------\n", *numiter);
-        // printf("st = %f\n\n", st);
-        // for (int i = 0; i < g->N; i++) {
-        //     printf("X[%d] = %f\n", i, xnext[i]);
-        // }
-        // printf("\n\n");
+
         // check if the computation has to end
         if (error <= eps || (*numiter) >= maxiter) {
             terminated = true;

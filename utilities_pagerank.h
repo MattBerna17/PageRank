@@ -17,12 +17,12 @@ typedef struct inmap {
  * @see inmap
  * 
  */
-typedef struct graph {
-    int N;          // number of nodes in the graph
-    int *out;       // array with the number of exiting edges for each node
-    inmap *in;     // array of entering edges for each node
-    pthread_mutex_t *graph_lock;
-} graph;
+typedef struct grafo {
+    int N;                          // number of nodes in the graph
+    int *out;                       // array with the number of exiting edges for each node
+    inmap *in;                      // array of entering edges for each node
+    pthread_mutex_t *graph_lock;    // lock to modify the out array
+} grafo;
 
 
 /**
@@ -44,7 +44,7 @@ typedef struct input_info {
     pthread_cond_t *canread;     // cv for reading from the buffer
     pthread_cond_t *canwrite;    // cv for writing to the buffer
     pthread_mutex_t *mutex;      // lock for the data array
-    graph *g;                   // instance of the graph
+    grafo *g;                   // instance of the graph
     edge **arr;                 // array to pass edges between threads
     int *available;             // number of elements in the array
     int n;                      // length of the data array
@@ -57,16 +57,17 @@ typedef struct input_info {
  * 
  */
 typedef struct compute_info {
-    bool *terminated;
-    graph *g;
+    bool *terminated;                   // bool to indicate the end of the computation
+    grafo *g;                           // graph to compute pagerank
 
+    // data to compute the Y array
     pthread_mutex_t *y_mutex;
     pthread_cond_t *y_completed;
     pthread_cond_t *barrier0;
     bool *is_y_computed;
-    // double *y;
     int *idx_y;
 
+    // data to compute the St contribute
     pthread_mutex_t *de_mutex;
     pthread_cond_t *de_completed;
     pthread_cond_t *barrier1;
@@ -74,6 +75,7 @@ typedef struct compute_info {
     double *st;
     int *idx_de;
 
+    // data to compute the pagerank formula (Xnext array)
     pthread_mutex_t *pr_mutex;
     pthread_cond_t *pr_completed;
     pthread_cond_t *barrier2;
@@ -85,6 +87,7 @@ typedef struct compute_info {
     double teleport;
     double d;
 
+    // data to compute the error
     pthread_mutex_t *error_mutex;
     pthread_cond_t *error_completed;
     pthread_cond_t *barrier3;
@@ -130,7 +133,7 @@ void *manage_signal(void *arg);
 
 
 /**
- * @brief Function executed by the threads to manage edges
+ * @brief Function executed by the threads to manage edges during the reading phase
  * 
  * @param arg input_info struct to communicate with the main thread
  * @return void* 
@@ -161,4 +164,4 @@ int cmp_ranks(const void *a, const void *b);
  * @param numiter   actual number of iteration
  * @return double   return array of pagerank
  */
-double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter);
+double *pagerank(grafo *g, double d, double eps, int maxiter, int taux, int *numiter);

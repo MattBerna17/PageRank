@@ -11,7 +11,6 @@ int main(int argc, char* argv[]) {
     double e = 1.e-7;
     char *infile;
 
-    // : --> needs an argument.
     while((opt = getopt(argc, argv, "k:m:d:e:t:h")) != -1) {
         switch (opt) {
             case 'k':
@@ -52,6 +51,8 @@ int main(int argc, char* argv[]) {
         printerr("[ERROR]: Bad file name. Terminating.", HERE);
     }
 
+
+    // block sigusr1 and sigusr2 signals
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGUSR1);
@@ -63,7 +64,7 @@ int main(int argc, char* argv[]) {
     pthread_cond_t canread = PTHREAD_COND_INITIALIZER;
     pthread_cond_t canwrite = PTHREAD_COND_INITIALIZER;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    graph *g = malloc(sizeof(graph));
+    grafo *g = malloc(sizeof(grafo));
     if (g == NULL) {
         printerr("[ERROR]: malloc not succeded. Terminating", HERE);
     }
@@ -149,47 +150,23 @@ int main(int argc, char* argv[]) {
 
     int terminated_threads = 0; // counter for terminated threads
     int i, j;
-    int nline = 0;
     while(terminated_threads < t) {
         edge *curr_edge = malloc(sizeof(edge));
         if (curr_edge == NULL) {
             printerr("[ERROR]: malloc not succeded. Terminating", HERE);
         }
         int e = fscanf(in, "%d %d", &i, &j);
-        nline++;
         if (e == EOF) {
             free(curr_edge);
             curr_edge = NULL;
             terminated_threads++; // count the number of thread ended
         } else if (e == 2) {
-            // if (nline % 100000 == 0) {
-            //     printf("\n\nline = %d\nedge = (%d, %d)\n\n", nline, i, j);
-            // }
             curr_edge->src = i - 1;
             curr_edge->dest = j - 1;
-            // printf("Letto (%d, %d)\n", i, j);
         } else {
             printerr("[ERROR]: Error during file read. Terminating.", HERE);
         }
-        // int e = read_line(&line, &length, in); // read line from the file
-        // if (e == 1) {
-        //     // the line contains i j, the edge from i to j
-        //     // tokenize the string using the space separator
-        //     char *v = strtok(line, " ");
-        //     int i = atoi(v);
-        //     v = strtok(NULL, " ");
-        //     int j = atoi(v);
-        //     curr_edge->src = i - 1;
-        //     curr_edge->dest = j - 1;
-
-        // } else if (e == 0) {
-        //     // end of file, notify threads by sending the special edge NULL
-        //     free(curr_edge);
-        //     curr_edge = NULL;
-        //     terminated_threads++; // count the number of thread ended
-        // } else {
-        //     printerr("[ERROR]: Error during file read. Terminating.", HERE);
-        // }
+        
         // get the mutex to write on the buffer
         xpthread_mutex_lock(&mutex, HERE);
         // if the buffer is full, wait until at least one element is free
