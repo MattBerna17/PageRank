@@ -1,10 +1,7 @@
 #include "utilities_pagerank.h"
-#define HERE __FILE__, __LINE__
-#define QUI __LINE__, __FILE__
+#define HERE __LINE__, __FILE__
 
 
-
-// controlla malloc
 
 int main(int argc, char* argv[]) {
     // read options from command line
@@ -14,7 +11,6 @@ int main(int argc, char* argv[]) {
     double e = 1.e-7;
     char *infile;
 
-    // : --> needs an argument.
     while((opt = getopt(argc, argv, "k:m:d:e:t:h")) != -1) {
         switch (opt) {
             case 'k':
@@ -34,7 +30,7 @@ int main(int argc, char* argv[]) {
                 break;
             // to print help message
             case 'h':
-                fprintf(stderr,"PageRank algorithm calculator.\nUsage: %s [-k K] [-m M] [-d D] [-e E] infile\n\nPositional arguments:\n \tinfile\t\tInput file in .mtx format (see https://math.nist.gov/MatrixMarket/formats.html#MMformat)\n\nOptions:\n\t-k\t\tShow the top K nodes (default: 3)\n\t-m\t\tMaximum number of operations (default: 100)\n\t-d\t\tDamping factor (default: 0.9)\n\t-e\t\tMax error (default: 1.0e7)\n\t-t\t\tNumber of auxiliary threads (default: 3)\n", argv[0]);
+                fprintf(stderr,"PageRank algorithm calculator.\nUsage: %s [-k K] [-m M] [-d D] [-e E] infile\n\nPositional arguments:\n \tinfile\t\tInput file in .mtx format (see https://math.nist.gov/MatrixMarket/formats.html#MMformat)\n\nOptions:\n\t-k\t\tShow the top K nodes (default: 3)\n\t-m\t\tMaximum number of operations (default: 100)\n\t-d\t\tDamping factor (default: 0.9)\n\t-e\t\tMax error (default: 1.0e-7)\n\t-t\t\tNumber of auxiliary threads (default: 3)\n", argv[0]);
                 exit(0);
             case '?':
                 printerr("[ERROR]: Parameter unrecognized. Terminating.", HERE);
@@ -55,25 +51,40 @@ int main(int argc, char* argv[]) {
         printerr("[ERROR]: Bad file name. Terminating.", HERE);
     }
 
+
+    // block sigusr1 and sigusr2 signals
     sigset_t mask;
-    sigemptyset(&mask);  // insieme di tutti i segnali
-    sigaddset(&mask, SIGUSR1); // elimino sigquit dall'insieme
-    pthread_sigmask(SIG_BLOCK, &mask, NULL); // block every signal except for SIGQUIT
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1);
+    sigaddset(&mask, SIGUSR2);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
 
     // create thread, read the file and communicate the lines read
     pthread_cond_t canread = PTHREAD_COND_INITIALIZER;
     pthread_cond_t canwrite = PTHREAD_COND_INITIALIZER;
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    graph *g = malloc(sizeof(graph));
+    grafo *g = malloc(sizeof(grafo));
+    if (g == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+    }
     int n = Buf_size;
     edge **arr = malloc(sizeof(edge*)*n);
+    if (arr == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+    }
     int available = 0;
     int cons_position = 0;
     int prod_position = 0;
 
     pthread_t *threads = malloc(sizeof(pthread_t)*t);
+    if (threads == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+    }
     input_info *infos = malloc(sizeof(input_info)*t);
+    if (infos == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+    }
 
     for (int i = 0; i < t; i++) {
         infos[i].canread = &canread;
@@ -85,13 +96,13 @@ int main(int argc, char* argv[]) {
         infos[i].available = &available;
         infos[i].position = &cons_position;
         
-        xpthread_create(&threads[i], NULL, &manage_edges, &infos[i], QUI);
+        xpthread_create(&threads[i], NULL, &manage_edges, &infos[i], HERE);
     }
 
 
+    // read the "header" lines: comments and r c n line
     size_t length = 0;
     char *line = NULL;
-    int n_edges = 0;
     bool init_line_read = false;
     while (!init_line_read) {
         int e = read_line(&line, &length, in);
@@ -108,19 +119,29 @@ int main(int argc, char* argv[]) {
                 char *v = strtok(line, " ");
                 r = atoi(v);
                 v = strtok(NULL, " "); // skip c
-                v = strtok(NULL, " ");
-                n_edges = atoi(v);
+                v = strtok(NULL, " "); // skip the number of edges
 
                 g->N = r; // number of nodes
                 int *out = malloc(sizeof(int)*g->N); // define the array containing the number of out edges of each node
-                inmap **in = malloc(sizeof(inmap*)*g->N);
+                if (out == NULL) {
+                    printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+                }
+                inmap *in = malloc(sizeof(inmap)*g->N);
+
+                if (in == NULL) {
+                    printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+                }
                 for (int i = 0; i < g->N; i++) {
                     out[i] = 0;
-                    in[i] = NULL;
+                    in[i].list = NULL;
+                    in[i].list_mutex = malloc(sizeof(pthread_mutex_t));
+                    xpthread_mutex_init(in[i].list_mutex, NULL, HERE);
                 }
                 g->out = out;
                 g->in = in;
                 init_line_read = true;
+                g->graph_lock = malloc(sizeof(pthread_mutex_t));
+                xpthread_mutex_init(g->graph_lock, NULL, HERE);
             }
         } else {
             printerr("[ERROR]: Formatting error in the input file. Terminating.", HERE);
@@ -129,42 +150,40 @@ int main(int argc, char* argv[]) {
 
 
     int terminated_threads = 0; // counter for terminated threads
+    int i, j;
     while(terminated_threads < t) {
         edge *curr_edge = malloc(sizeof(edge));
-        int e = read_line(&line, &length, in); // read line from the file
-        if (e == 1) {
-            // the line contains i j, the edge from i to j
-            // tokenize the string using the space separator
-            char *v = strtok(line, " ");
-            int i = atoi(v);
-            v = strtok(NULL, " ");
-            int j = atoi(v);
+        if (curr_edge == NULL) {
+            printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+        }
+        int e = fscanf(in, "%d %d", &i, &j);
+        if (e == EOF) {
+            free(curr_edge);
+            curr_edge = NULL; // send NULL as special value to make a thread terminate
+            terminated_threads++; // count the number of thread ended
+        } else if (e == 2) {
             curr_edge->src = i - 1;
             curr_edge->dest = j - 1;
-        } else if (e == 0) {
-            // end of file, notify threads by sending the special edge NULL
-            free(curr_edge);
-            curr_edge = NULL;
-            terminated_threads++; // count the number of thread ended
         } else {
             printerr("[ERROR]: Error during file read. Terminating.", HERE);
         }
+        
         // get the mutex to write on the buffer
-        xpthread_mutex_lock(&mutex, QUI);
+        xpthread_mutex_lock(&mutex, HERE);
         // if the buffer is full, wait until at least one element is free
         while (available == n) {
-            xpthread_cond_wait(&canwrite, &mutex, QUI);
+            xpthread_cond_wait(&canwrite, &mutex, HERE);
         }
         // add the edge in the buffer
         arr[prod_position % n] = curr_edge;
         prod_position++;
         available++;
-        xpthread_cond_signal(&canread, QUI); // notify the consumers that an edge is available
-        xpthread_mutex_unlock(&mutex, QUI);
+        xpthread_cond_signal(&canread, HERE); // notify the consumers that an edge is available
+        xpthread_mutex_unlock(&mutex, HERE);
     }
 
     for (int i = 0; i < t; i++) {
-        xpthread_join(threads[i], NULL, QUI);
+        xpthread_join(threads[i], NULL, HERE);
     }
     
     // print the infos after the buffer communication
@@ -189,10 +208,16 @@ int main(int argc, char* argv[]) {
     double *res = pagerank(g, d, e, m, t, &numiter);
     double sum_ranks = 0; // to count the sum of all ranks
     rank **top_ranks = malloc(sizeof(rank *) * g->N); // to store the ranks in order
+    if (top_ranks == NULL) {
+        printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+    }
     
     for (int i = 0; i < g->N; i++) {
         sum_ranks += res[i];
         top_ranks[i] = malloc(sizeof(rank));
+        if (top_ranks[i] == NULL) {
+            printerr("[ERROR]: malloc not succeded. Terminating", HERE);
+        }
         top_ranks[i]->index = i;
         top_ranks[i]->val = res[i];
     }
@@ -204,7 +229,7 @@ int main(int argc, char* argv[]) {
     } else {
         fprintf(stdout, "Converged after %d iterations\n", numiter);
     }
-    fprintf(stdout, "Sum of ranks: %f   (should be 1)\n", sum_ranks);
+    fprintf(stdout, "Sum of ranks: %.4f   (should be 1)\n", sum_ranks);
     fprintf(stdout, "Top %d nodes:\n", k);
     for (int i = 0; i < k; i++) {
         fprintf(stdout, "  %d %f\n", top_ranks[i]->index, top_ranks[i]->val);
@@ -212,15 +237,17 @@ int main(int argc, char* argv[]) {
 
 
     // free all the memory allocated and destroy condition variables and mutex
-    xpthread_mutex_destroy(&mutex, QUI);
-    xpthread_cond_destroy(&canread, QUI);
-    xpthread_cond_destroy(&canwrite, QUI);
+    xpthread_mutex_destroy(&mutex, HERE);
+    xpthread_cond_destroy(&canread, HERE);
+    xpthread_cond_destroy(&canwrite, HERE);
     free(line);
     for (int i = 0; i < g->N; i++) {
-        clear(g->in[i]);
+        clear(g->in[i].list);
+        free(g->in[i].list_mutex);
     }
     free(g->in);
     free(g->out);
+    free(g->graph_lock);
     free(arr);
     fclose(in);
     free(infile);

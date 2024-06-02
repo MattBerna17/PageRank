@@ -3,26 +3,26 @@
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
 /**
- * @brief Data structure to implement the incoming nodes for each node (binary search tree)
+ * @brief Data structure to store the list of incoming edges for a node in the graph
  * 
  */
 typedef struct inmap {
-    int val;                // index of the node
-    struct inmap* left;     // pointer to the left child
-    struct inmap* right;    // pointer to the right child
+    node *list;                     // list of nodes to store
+    pthread_mutex_t *list_mutex;    // mutex to access the list
 } inmap;
 
 
 /**
- * @brief Data structure to implement the adjacent graph
+ * @brief Data structure to implement the graph
  * @see inmap
  * 
  */
-typedef struct graph {
-    int N;          // number of nodes in the graph
-    int *out;       // array with the number of exiting edges for each node
-    inmap **in;     // array of entering edges for each node
-} graph;
+typedef struct grafo {
+    int N;                          // number of nodes in the graph
+    int *out;                       // array with the number of exiting edges for each node
+    inmap *in;                      // array of incoming edges for each node
+    pthread_mutex_t *graph_lock;    // mutex to modify the out array
+} grafo;
 
 
 /**
@@ -41,10 +41,10 @@ typedef struct edge {
  * 
  */
 typedef struct input_info {
-    pthread_cond_t *canread;     // cv for reading from the buffer
-    pthread_cond_t *canwrite;    // cv for writing to the buffer
-    pthread_mutex_t *mutex;      // lock for the data array
-    graph *g;                   // instance of the graph
+    pthread_cond_t *canread;    // cv for reading from the buffer
+    pthread_cond_t *canwrite;   // cv for writing to the buffer
+    pthread_mutex_t *mutex;     // mutex for the data array
+    grafo *g;                   // instance of the graph
     edge **arr;                 // array to pass edges between threads
     int *available;             // number of elements in the array
     int n;                      // length of the data array
@@ -52,37 +52,49 @@ typedef struct input_info {
 } input_info;
 
 
-
-
+/**
+ * @brief Data structure to pass info to the threads that need to compute the pagerank calculation
+ * 
+ */
 typedef struct compute_info {
-    // condition variables to notify the start and end of pagerank computation in the X(t+1) array
-    pthread_cond_t *start_pagerank_computation;
-    pthread_cond_t *end_pagerank_computation;
-    pthread_mutex_t *mutex;                     // mutex to access the shared data
-    graph *g;
-    int *n_computed;                            // number of elements of the X(t+1) array computed
-    int *position;                              // position of the current member of X(t+1)
-    double teleport;                            // teleporting term
-    double d;                                   // damping factor
-    double *x;                                  // array X(t)
-    double *y;                                  // array Y(t)
-    double *xnext;                              // array X(t+1)
-    int n;                                      // number of elements of the arrays X, Y, Xnext
+    bool *terminated;                   // bool to indicate the end of the computation
+    grafo *g;                           // graph to compute pagerank
 
-    // condition variables to notify the start and end of error computation
-    pthread_cond_t *start_error_computation;
-    pthread_cond_t *end_error_computation;
-    // condition variables to notify the start and end of Y(t+1) computation
-    pthread_cond_t *start_y_computation;
-    pthread_cond_t *end_y_computation;
-    // condition variables to notify the start and end of S_t computation
-    pthread_cond_t *start_deadend_computation;
-    pthread_cond_t *end_deadend_computation;
-    int start_index_x;                          // starting index of the portion of array assigned to this thread (for error, Y(t) and St)
-    int end_index_x;                            // ending index of the portion of array assigned to this thread (for error, Y(t) and St)
-    double *error_calculated;                   // value of error calculated by the thread in his portion of the array
+    // data to compute the Y array
+    pthread_mutex_t *y_mutex;
+    pthread_cond_t *y_completed;
+    pthread_cond_t *barrier0;
+    bool *is_y_computed;
+    int *idx_y;
+
+    // data to compute the St contribute
+    pthread_mutex_t *de_mutex;
+    pthread_cond_t *de_completed;
+    pthread_cond_t *barrier1;
+    bool *is_de_computed;
+    double *st;
+    int *idx_de;
+
+    // data to compute the pagerank formula (Xnext array)
+    pthread_mutex_t *pr_mutex;
+    pthread_cond_t *pr_completed;
+    pthread_cond_t *barrier2;
+    bool *is_pr_computed;
+    double *x;
+    double *xnext;
+    double *y;
+    int *idx_pr;
+    double teleport;
+    double d;
+
+    // data to compute the error
+    pthread_mutex_t *error_mutex;
+    pthread_cond_t *error_completed;
+    pthread_cond_t *barrier3;
+    bool *is_error_computed;
+    double *error;
+    int *idx_error;
 } compute_info;
-
 
 
 /**
@@ -111,41 +123,22 @@ typedef struct rank {
 
 // ----------------------------------  FUNCTIONS  ----------------------------------
 /**
- * @brief Function to add the value passed in the inmap
+ * @brief Function executed by the signal manager thread
  * 
- * @param t         root node of the inmap tree
- * @param val       value to add to the inmap tree
- * @return true     if the new value is added correctly,
- * @return false    if the value was already present in the inmap tree
-*/
-bool add(inmap** t, int val);
-
-/**
- * @brief Function to free the memory blocks allocated dinamically for the inmap tree
- * 
- * @param t root node of the inmap tree
+ * @param arg signal_info struct to receive data from the main thread
+ * @return void* 
  */
-void clear(inmap *t);
+void *manage_signal(void *arg);
 
 
-void *tgestore(void *v);
 
 /**
- * @brief Function executed by the threads to manage edges
+ * @brief Function executed by the threads to manage edges during the reading phase
  * 
  * @param arg input_info struct to communicate with the main thread
  * @return void* 
  */
 void *manage_edges(void *arg);
-
-
-/**
- * @brief Function to compare ranks (used for qsort call)
- * 
- * @param a first rank to compare
- * @param b second rank to compare
- */
-int cmp_ranks(const void *a, const void *b);
 
 
 
@@ -161,4 +154,14 @@ int cmp_ranks(const void *a, const void *b);
  * @param numiter   actual number of iteration
  * @return double   return array of pagerank
  */
-double *pagerank(graph *g, double d, double eps, int maxiter, int taux, int *numiter);
+double *pagerank(grafo *g, double d, double eps, int maxiter, int taux, int *numiter);
+
+
+
+/**
+ * @brief Function to compare ranks (used for qsort call)
+ * 
+ * @param a first rank to compare
+ * @param b second rank to compare
+ */
+int cmp_ranks(const void *a, const void *b);
