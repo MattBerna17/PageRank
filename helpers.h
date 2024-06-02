@@ -3,12 +3,12 @@
 
 // ---------------------------------- DATA STRUCTURES ----------------------------------
 /**
- * @brief Data structure to represent the node of an integer tree
+ * @brief Data structure to represent the node of an integer linked list
  * 
  */
 typedef struct node {
     int val;                // index of the node
-    struct node* next;      // pointer to the left child
+    struct node* next;      // pointer to the next node
 } node;
 
 
@@ -17,15 +17,15 @@ typedef struct node {
  * @brief Helper function to print errors
  * 
  * @param msg message to print
- * @param file file containing the error
  * @param line line that caused the error
+ * @param file file containing the error
  */
 void printerr(char *msg, int line, char *file);
 
 /**
  * @brief Function to read a line from the specified file
  * 
- * @param line      pointer to the char array to store the string
+ * @param line      pointer to the string to store the line
  * @param length    dimension of the string
  * @param f         file to read the line from
  * @return int      1 if data has been read from the file. 0 if file has ended. -1 if an error occurred

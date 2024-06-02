@@ -3,25 +3,25 @@
 
 // ----------------------------------  DATA STRUCTURES  ----------------------------------
 /**
- * @brief Data structure to store a tree in the graph
+ * @brief Data structure to store the list of incoming edges for a node in the graph
  * 
  */
 typedef struct inmap {
-    node *list;
-    pthread_mutex_t *list_mutex;
+    node *list;                     // list of nodes to store
+    pthread_mutex_t *list_mutex;    // mutex to access the list
 } inmap;
 
 
 /**
- * @brief Data structure to implement the adjacent graph
+ * @brief Data structure to implement the graph
  * @see inmap
  * 
  */
 typedef struct grafo {
     int N;                          // number of nodes in the graph
     int *out;                       // array with the number of exiting edges for each node
-    inmap *in;                      // array of entering edges for each node
-    pthread_mutex_t *graph_lock;    // lock to modify the out array
+    inmap *in;                      // array of incoming edges for each node
+    pthread_mutex_t *graph_lock;    // mutex to modify the out array
 } grafo;
 
 
@@ -41,9 +41,9 @@ typedef struct edge {
  * 
  */
 typedef struct input_info {
-    pthread_cond_t *canread;     // cv for reading from the buffer
-    pthread_cond_t *canwrite;    // cv for writing to the buffer
-    pthread_mutex_t *mutex;      // lock for the data array
+    pthread_cond_t *canread;    // cv for reading from the buffer
+    pthread_cond_t *canwrite;   // cv for writing to the buffer
+    pthread_mutex_t *mutex;     // mutex for the data array
     grafo *g;                   // instance of the graph
     edge **arr;                 // array to pass edges between threads
     int *available;             // number of elements in the array
@@ -143,16 +143,6 @@ void *manage_edges(void *arg);
 
 
 /**
- * @brief Function to compare ranks (used for qsort call)
- * 
- * @param a first rank to compare
- * @param b second rank to compare
- */
-int cmp_ranks(const void *a, const void *b);
-
-
-
-/**
  * @brief Function to calculate pagerank algorithm
  * @see graph
  * 
@@ -165,3 +155,13 @@ int cmp_ranks(const void *a, const void *b);
  * @return double   return array of pagerank
  */
 double *pagerank(grafo *g, double d, double eps, int maxiter, int taux, int *numiter);
+
+
+
+/**
+ * @brief Function to compare ranks (used for qsort call)
+ * 
+ * @param a first rank to compare
+ * @param b second rank to compare
+ */
+int cmp_ranks(const void *a, const void *b);

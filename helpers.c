@@ -40,7 +40,7 @@ bool add(node** l, int val) {
         return false;
     }
 
-    node* new_node = (node*)malloc(sizeof(node));
+    node* new_node = malloc(sizeof(node));
     if (new_node == NULL) {
         printerr("[ERROR] malloc not succeded. Terminating.", HERE);
     }

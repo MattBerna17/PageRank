@@ -4,15 +4,17 @@
 
 void *manage_signal(void *arg) {
     signal_info* info = (signal_info *) arg;
+    // define the mask of signals to accept and manage (SIGUSR1 and SIGUSR2)
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGUSR1);
     sigaddset(&mask, SIGUSR2); // when the pagerank computation has ended, the main thread sends a SIGUSR2 signal to the signal manager thread
-    int s = 0;
+    int s = 0; // number of the signal recived
     while (!(*info->terminated)) {
         int e = sigwait(&mask, &s);
         if (e != 0) printerr("[ERROR]: error during signal management. Terminating", HERE);
         if (s == SIGUSR1) {
+            // find node with max pagerank
             int index = 0;
             double max_pagerank = info->x[index];
             for (int i = 0; i < info->n; i++) {
@@ -21,6 +23,7 @@ void *manage_signal(void *arg) {
                     index = i;
                 }
             }
+            // print the max pagerank of the current iteration
             fprintf(stderr, "Current number of iterations: %d\n", *info->numiter);
             fprintf(stderr, "Node with maximum pagerank value: %d %f\n", index, max_pagerank);
         } else if (s == SIGUSR2 && *info->terminated) {
@@ -65,6 +68,7 @@ void *manage_edges(void *arg) {
                     printerr("[ERROR]: edge source or destination out of legal range. Terminating.", HERE);
                 }
                 
+                // add the edge to the list of incoming edges of the destination node
                 xpthread_mutex_lock(info->g->in[curr_edge->dest].list_mutex, HERE);
                 bool added = add(&info->g->in[curr_edge->dest].list, curr_edge->src);
                 xpthread_mutex_unlock(info->g->in[curr_edge->dest].list_mutex, HERE);
@@ -79,7 +83,7 @@ void *manage_edges(void *arg) {
             free(curr_edge);
         }
     }
-    return 0; // not using pthread_exit(NULL) since valgrind recognizes it as "still reachable"
+    return 0;
 }
 
 
@@ -89,27 +93,11 @@ double compute_sum_y(grafo *g, double *y, int j) {
     double sum = 0.0;
     node *current = g->in[j].list;
 
-    // array of nodes to simulate the call stack
-    node **stack = (node**)malloc(g->N * sizeof(node*));
-    int top = -1; // index for the start or the stack
-
-    if (current != NULL) {
-        stack[++top] = current;
-    }
-
-    // while the stack contains at least one element...
-    while (top >= 0) {
-        current = stack[top--]; // pop from the stack the element
-
-        // process it
+    while (current != NULL) {
         sum += y[current->val];
-
-        if (current->next != NULL) {
-            stack[++top] = current->next;
-        }
+        current = current->next;
     }
 
-    free(stack);
     return sum;
 }
 
@@ -244,7 +232,7 @@ void compute_error(compute_info *info) {
  */
 void *tbody(void *arg) {
     compute_info *info = (compute_info *) arg;
-    // repeat these 3 computations until the main signals the end of the computation
+    // repeat these 3 computations until the main declares the end of the computation
     while (!(*info->terminated)) {
         // zero phase: compute Y_i for the current iteration
         compute_y(info);
@@ -385,9 +373,10 @@ double *pagerank(grafo *g, double d, double eps, int maxiter, int taux, int *num
     }
     sigset_t mask;
     sigemptyset(&mask);
-    sigaddset(&mask, SIGUSR1); // add SIGUSR1 to the list of blocked signals
+    // add SIGUSR1 and SIGUSR2 to the list of blocked signals
+    sigaddset(&mask, SIGUSR1);
     sigaddset(&mask, SIGUSR2);
-    pthread_sigmask(SIG_BLOCK, &mask, NULL); // block SIGUSR1 for this thread (main thread)
+    pthread_sigmask(SIG_BLOCK, &mask, NULL); // block SIGUSR1 and SIGUSR2 for this thread (main thread)
     // create the signal manager thread
     pthread_t *sig_manager = malloc(sizeof(pthread_t));
     if (sig_manager == NULL) {
@@ -504,6 +493,7 @@ double *pagerank(grafo *g, double d, double eps, int maxiter, int taux, int *num
 int cmp_ranks(const void *a, const void *b) {
     rank **r1 = (rank **) a;
     rank **r2 = (rank **) b;
+    // order them for descending value of pagerank
     if ((*r1)->val < (*r2)->val) return 1;
     else if ((*r1)->val > (*r2)->val) return -1;
     else return 0;

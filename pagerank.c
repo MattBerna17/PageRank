@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
                 break;
             // to print help message
             case 'h':
-                fprintf(stderr,"PageRank algorithm calculator.\nUsage: %s [-k K] [-m M] [-d D] [-e E] infile\n\nPositional arguments:\n \tinfile\t\tInput file in .mtx format (see https://math.nist.gov/MatrixMarket/formats.html#MMformat)\n\nOptions:\n\t-k\t\tShow the top K nodes (default: 3)\n\t-m\t\tMaximum number of operations (default: 100)\n\t-d\t\tDamping factor (default: 0.9)\n\t-e\t\tMax error (default: 1.0e7)\n\t-t\t\tNumber of auxiliary threads (default: 3)\n", argv[0]);
+                fprintf(stderr,"PageRank algorithm calculator.\nUsage: %s [-k K] [-m M] [-d D] [-e E] infile\n\nPositional arguments:\n \tinfile\t\tInput file in .mtx format (see https://math.nist.gov/MatrixMarket/formats.html#MMformat)\n\nOptions:\n\t-k\t\tShow the top K nodes (default: 3)\n\t-m\t\tMaximum number of operations (default: 100)\n\t-d\t\tDamping factor (default: 0.9)\n\t-e\t\tMax error (default: 1.0e-7)\n\t-t\t\tNumber of auxiliary threads (default: 3)\n", argv[0]);
                 exit(0);
             case '?':
                 printerr("[ERROR]: Parameter unrecognized. Terminating.", HERE);
@@ -100,6 +100,7 @@ int main(int argc, char* argv[]) {
     }
 
 
+    // read the "header" lines: comments and r c n line
     size_t length = 0;
     char *line = NULL;
     bool init_line_read = false;
@@ -158,7 +159,7 @@ int main(int argc, char* argv[]) {
         int e = fscanf(in, "%d %d", &i, &j);
         if (e == EOF) {
             free(curr_edge);
-            curr_edge = NULL;
+            curr_edge = NULL; // send NULL as special value to make a thread terminate
             terminated_threads++; // count the number of thread ended
         } else if (e == 2) {
             curr_edge->src = i - 1;
