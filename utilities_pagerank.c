@@ -88,7 +88,14 @@ void *manage_edges(void *arg) {
 
 
 
-
+/**
+ * @brief Function to sum all the Y_i for each i in the inmap of j
+ * 
+ * @param g graph to use
+ * @param y Y vector to get the values from
+ * @param j index of the current node to compute Y_i for each node in the inmap of j
+ * @return double sum of the in-nodes
+ */
 double compute_sum_y(grafo *g, double *y, int j) {
     double sum = 0.0;
     node *current = g->in[j].list;

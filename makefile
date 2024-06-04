@@ -9,7 +9,6 @@ all: $(EXECS)
 
 $(EXECS): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
-	rm -f $(OBJS)
 
 %.o: %.c xerrori.h utilities_pagerank.h helpers.h
 	$(CC) $(CFLAGS) -c $<
